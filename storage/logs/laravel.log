@@ -181,3 +181,13 @@
 #39 C:\\Users\\bdCalling\\Herd\\keekosqurd\\public\\index.php(17): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
 #40 C:\\Program Files\\Herd\\resources\\app.asar.unpacked\\resources\\valet\\server.php(139): require('C:\\\\Users\\\\bdCall...')
 #41 {main}"} 
+[2025-01-15 08:03:30] local.INFO: Product stored successfully {"product_id":1} 
+[2025-01-15 08:03:30] local.INFO: Product stored successfully {"product_id":2} 
+[2025-01-15 08:03:30] local.INFO: Product stored successfully {"product_id":3} 
+[2025-01-15 08:03:30] local.INFO: Product stored successfully {"product_id":4} 
+[2025-01-15 08:03:30] local.INFO: Product stored successfully {"product_id":5} 
+[2025-01-15 08:03:30] local.INFO: Product stored successfully {"product_id":6} 
+[2025-01-15 08:03:30] local.INFO: Product stored successfully {"product_id":7} 
+[2025-01-15 08:03:36] local.INFO: Product stored successfully {"product_id":8} 
+[2025-01-15 08:03:48] local.INFO: Product stored successfully {"product_id":9} 
+[2025-01-15 08:03:57] local.INFO: Product stored successfully {"product_id":10} 
