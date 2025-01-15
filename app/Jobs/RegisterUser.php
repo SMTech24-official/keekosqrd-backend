@@ -30,9 +30,12 @@ class RegisterUser implements ShouldQueue
             $user = User::create([
                 'first_name' => $this->data['first_name'] ?? '',
                 'last_name' => $this->data['last_name'] ?? '',
+                'country' => $this->data['country'] ?? '',
+                'city' => $this->data['city'] ?? '',
+                'zip_code' => $this->data['zip_code'] ?? '',
+                'address' => $this->data['address'] ?? '',
                 'email' => $this->data['email'] ?? '',
                 'password' => Hash::make($this->data['password'] ?? ''),
-                'is_approved' => 0, // User is not approved by default
                 'is_admin' => $this->data['is_admin'] ?? 0, // Optional admin flag
             ]);
 

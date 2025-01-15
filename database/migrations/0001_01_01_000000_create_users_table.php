@@ -15,13 +15,15 @@ return new class extends Migration
             $table->id();
             $table->string('first_name')->nullable()->default(null);
             $table->string('last_name')->nullable()->default(null);
-            $table->string('name')->nullable()->default(null);
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->string('country')->nullable()->default(null);
+            $table->string('city')->nullable()->default(null);
+            $table->string('zip_code')->nullable()->default(null);
+            $table->string('address')->nullable()->default(null);
             $table->string('is_admin')->nullable()->default(0);
             $table->timestamp('last_login_at')->nullable(); // Add last_login_at column
-            $table->string('is_approved')->nullable()->default(0);
             $table->string('status')->nullable()->default('active');
             $table->rememberToken();
             $table->timestamps();

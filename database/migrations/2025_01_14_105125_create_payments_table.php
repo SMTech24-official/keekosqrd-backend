@@ -11,13 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('chat_titles', function (Blueprint $table) {
-            $table->id(); // Primary key
-            $table->unsignedBigInteger('user_id'); // Foreign key for the User
-            $table->string('title'); // Title of the chat
-            $table->timestamps(); // Created at and Updated at timestamps
+        Schema::create('payments', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            // add payment_intent_id
+            $table->string('payment_intent_id')->nullable();
+            // add card payment_method
+            $table->string('payment_method')->nullable();
+            $table->timestamps();
 
-            // Define the foreign key constraint
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }
@@ -27,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('chat_titles');
+        Schema::dropIfExists('payments');
     }
 };

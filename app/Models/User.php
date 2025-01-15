@@ -22,8 +22,13 @@ class User extends Authenticatable implements JWTSubject
         'last_name',
         'email',
         'password',
+        'country',
+        'city',
+        'zip_code',
+        'address',
+        'status',
+        'last_login_at',
         'is_admin',
-        'is_approved'
     ];
 
     /**
@@ -53,10 +58,6 @@ class User extends Authenticatable implements JWTSubject
         $this->notify(new \App\Notifications\ResetPasswordNotification($url));
     }
 
-    public function chatTitles()
-    {
-        return $this->hasMany(ChatTitle::class);
-    }
 
     public function getJWTIdentifier()
     {

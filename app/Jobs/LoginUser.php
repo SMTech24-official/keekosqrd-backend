@@ -47,18 +47,6 @@ class LoginUser implements ShouldQueue
                 ];
             }
 
-            // Skip approval check for admin accounts
-            if (!$user->is_admin) {
-                // Check if the user is approved
-                if ($user->is_approved == 0) {
-                    Log::error('Login failed: User account not approved');
-                    return [
-                        'error' => 'Your account is pending approval by the admin.',
-                        'status_code' => 403
-                    ];
-                }
-            }
-
             Log::info('User authenticated successfully:', ['user' => $user->toArray()]);
 
             // Create token with claims

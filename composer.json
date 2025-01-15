@@ -17,6 +17,7 @@
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
         "openai-php/laravel": "^0.10.2",
+        "stripe/stripe-php": "^16.4",
         "tymon/jwt-auth": "^2.1"
     },
     "require-dev": {

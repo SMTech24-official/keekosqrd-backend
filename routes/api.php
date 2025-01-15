@@ -8,11 +8,14 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\OrfaAIController;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\ChatTitleController;
 use App\Http\Controllers\CaseExampleController;
 use App\Http\Controllers\ContactFormController;
 use App\Http\Controllers\TestimonialController;
+use App\Http\Controllers\TransactionController;
 // use App\Jobs\TestJob;
 
 
@@ -23,9 +26,8 @@ Route::post('forgot-password', [ApiController::class, 'forgotPassword']);
 Route::post('verify-otp', [ApiController::class, 'verifyOtp']);
 Route::post('reset-password', [ApiController::class, 'resetPassword']);
 
-
-
-
+Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
+Route::post('/confirm-payment', [ApiController::class, 'confirmPayment']);
 
 Route::group([
     "middleware" => ["auth:api"]
@@ -45,4 +47,12 @@ Route::group([
     Route::put("update-profile", [UserController::class, "updateProfile"]);
     Route::get("refresh-token", [ApiController::class, "refreshToken"]);
     Route::get("logout", [ApiController::class, "logout"]);
+
+    // Product CRUD routes
+    Route::get('/products', [ProductController::class, 'index'])->name('products.index'); // Retrieve all products
+    Route::post('/products', [ProductController::class, 'store'])->name('products.store'); // Create a new product
+    Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show'); // Retrieve a single product
+    Route::post('/products/update/{id}', [ProductController::class, 'update'])->name('products.update');
+
+    Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('products.destroy'); // Delete a product
 });
