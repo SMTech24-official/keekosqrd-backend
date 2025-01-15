@@ -18,7 +18,14 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         return $this->safeCall(function () use ($request) {
-            $validator = Validator::make($request->all(), [
+            // Convert 'status' to boolean if present
+            $input = $request->all();
+            if (isset($input['status'])) {
+                $input['status'] = filter_var($input['status'], FILTER_VALIDATE_BOOLEAN);
+            }
+
+            // Validate input
+            $validator = Validator::make($input, [
                 'product_name' => 'required|string|max:255',
                 'brand_name' => 'required|string|max:255',
                 'model' => 'nullable|string|max:255',
@@ -26,6 +33,7 @@ class ProductController extends Controller
                 'description' => 'nullable|string',
                 'price' => 'required|numeric|min:0',
                 'product_image' => 'nullable|image|max:2048',
+                'status' => 'nullable|boolean',
             ]);
 
             if ($validator->fails()) {
@@ -34,17 +42,22 @@ class ProductController extends Controller
 
             $data = $validator->validated();
 
+            // Handle file upload
             if ($request->hasFile('product_image')) {
                 $data['product_image'] = $request->file('product_image')->store('product_images', 'public');
             }
 
+            // Dispatch the job
             ProductStoreJob::dispatch($data);
 
             return $this->successResponse('Product is being stored', [
-                'data' => $data
+                'data' => $data,
             ]);
         });
     }
+
+
+
 
     /**
      * Get all products.
@@ -66,7 +79,7 @@ class ProductController extends Controller
     {
         return $this->safeCall(function () use ($id) {
             $product = Product::findOrFail($id);
-            return $this->successResponse('Product retrieved successfully',[
+            return $this->successResponse('Product retrieved successfully', [
                 'product' => $product
             ]);
         });
@@ -80,7 +93,14 @@ class ProductController extends Controller
         return $this->safeCall(function () use ($request, $id) {
             $product = Product::findOrFail($id);
 
-            $validator = Validator::make($request->all(), [
+            // Convert 'status' to boolean if present
+            $input = $request->all();
+            if (isset($input['status'])) {
+                $input['status'] = filter_var($input['status'], FILTER_VALIDATE_BOOLEAN);
+            }
+
+            // Validate input
+            $validator = Validator::make($input, [
                 'product_name' => 'nullable|string|max:255',
                 'brand_name' => 'nullable|string|max:255',
                 'model' => 'nullable|string|max:255',
@@ -88,6 +108,7 @@ class ProductController extends Controller
                 'description' => 'nullable|string',
                 'price' => 'nullable|numeric|min:0',
                 'product_image' => 'nullable|image|max:2048',
+                'status' => 'nullable|boolean',
             ]);
 
             if ($validator->fails()) {
@@ -96,6 +117,7 @@ class ProductController extends Controller
 
             $data = $validator->validated();
 
+            // Handle file upload
             if ($request->hasFile('product_image')) {
                 // Delete old image if it exists
                 if ($product->product_image && \Storage::disk('public')->exists($product->product_image)) {
@@ -115,16 +137,14 @@ class ProductController extends Controller
 
 
 
-    /**
-     * Delete a product by ID.
-     */
     public function destroy($id)
     {
         return $this->safeCall(function () use ($id) {
             $product = Product::findOrFail($id);
             $product->delete();
 
-            return $this->successResponse('Product deleted successfully',
+            return $this->successResponse(
+                'Product deleted successfully',
                 ['product' => $product]
             );
         });
