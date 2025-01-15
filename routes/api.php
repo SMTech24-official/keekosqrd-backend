@@ -29,6 +29,9 @@ Route::post('reset-password', [ApiController::class, 'resetPassword']);
 Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
 Route::post('/confirm-payment', [ApiController::class, 'confirmPayment']);
 
+Route::get('/active-products', [ProductController::class, 'activeProducts'])->name('products.active');
+
+
 Route::group([
     "middleware" => ["auth:api"]
 ], function () {
@@ -38,8 +41,12 @@ Route::group([
     Route::get("users", [ApiController::class, "users"]);
     Route::post("users/create", [ApiController::class, "store"]);
     Route::get("users/show", [ApiController::class, "getAllUsers"]);
+    Route::get("user/{id}", [ApiController::class, "show"]);
+    Route::post('/user/{id}/update', [ApiController::class, 'update']);
     Route::post("users/active-inactive/{id}", [ApiController::class, "activeInactive"]);
     Route::delete("users/delete/{id}", [ApiController::class, "destroy"]);
+    Route::post('/export-users', [ApiController::class, 'exportUsers'])->name('users.export');
+
 
     Route::post('/users/search', [ApiController::class, 'search']);
 
@@ -55,4 +62,7 @@ Route::group([
     Route::post('/products/update/{id}', [ProductController::class, 'update'])->name('products.update');
 
     Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('products.destroy'); // Delete a product
+    // make a route to get a list of all active products
+
+    Route::post('/products/{id}/vote', [ProductController::class, 'vote']);
 });
