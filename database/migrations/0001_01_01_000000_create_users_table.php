@@ -27,6 +27,7 @@ return new class extends Migration
             $table->string('is_admin')->nullable()->default(0);
             $table->timestamp('last_login_at')->nullable(); // Add last_login_at column
             $table->string('status')->nullable()->default('active');
+            $table->json('payment_method')->nullable()->default(null);
             $table->rememberToken();
             $table->timestamps();
         });

@@ -25,9 +25,12 @@ class ApiController extends Controller
 {
     use HandlesApiResponse, AuthTrait, DispatchesJobs;
 
+
+
     public function register(Request $request)
     {
         return $this->safeCall(function () use ($request) {
+            // Validate the request
             $validator = Validator::make($request->all(), [
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'required|string|max:255',
@@ -37,8 +40,8 @@ class ApiController extends Controller
                 'address' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:6|confirmed',
-                'payment_intent_id' => 'required|string', // Ensure payment_intent_id is passed
-                'payment_method' => 'nullable|string',
+                'payment_intent_id' => 'required|string', // Ensure payment_intent_id is provided
+                'payment_method' => 'required|string',   // Ensure payment_method is provided
             ]);
 
             if ($validator->fails()) {
@@ -52,28 +55,49 @@ class ApiController extends Controller
                 return $this->errorResponse($paymentConfirmation['message'], 400, $paymentConfirmation['error'] ?? []);
             }
 
-            $data = $request->only(['first_name', 'last_name', 'country', 'city', 'zip_code', 'address' ,'email', 'password']);
-            $job = new RegisterUser($data);
+            // Prepare user data
+            $data = $request->only([
+                'first_name',
+                'last_name',
+                'country',
+                'city',
+                'zip_code',
+                'address',
+                'email',
+                'password',
+            ]);
+            $data['password'] = Hash::make($data['password']);
 
-            $result = $job->getResult(); // Get the result directly
+            // Create the user
+            $user = User::create($data);
 
-            \Log::info('RegisterUser job result:', $result);
+            // Log user creation
+            \Log::info('User created successfully:', ['user' => $user->toArray()]);
 
-            if (!is_array($result)) {
-                return $this->errorResponse('Unexpected server error', 500);
-            }
+            // Store payment record
+            Payment::create([
+                'user_id' => $user->id,
+                'payment_intent_id' => $request->payment_intent_id,
+                'payment_method' => $request->payment_method,
+                'amount' => $paymentConfirmation['paymentIntent']->amount / 100, // Convert cents to dollars
+            ]);
 
-            if (isset($result['error'])) {
-                return $this->errorResponse($result['error'], 401);
-            }
+            \Log::info('Payment record stored successfully for user:', ['user_id' => $user->id]);
 
-            $cookie = cookie('token', $result['token'], 60); // 60 minutes
+            // Generate a JWT token for the user
+            $token = JWTAuth::fromUser($user);
+
+            // Log token generation
+            \Log::info('JWT token generated successfully.');
+
+            // Return success response with token and user details
+            $cookie = cookie('token', $token, 60); // 60 minutes
 
             return $this->successResponse(
-                'User registered successfully',
+                'User registered successfully.',
                 [
-                    'token' => $result['token'],
-                    'user' => $result['user']
+                    'token' => $token,
+                    'user' => $user->toArray(),
                 ]
             )->cookie($cookie);
         });
@@ -88,15 +112,31 @@ class ApiController extends Controller
             $paymentIntent = \Stripe\PaymentIntent::retrieve($request->payment_intent_id);
 
             // Confirm the PaymentIntent with a return URL
-            $confirmedPaymentIntent = $paymentIntent->confirm([
+            $paymentIntent = $paymentIntent->confirm([
                 'payment_method' => $request->payment_method,
-                'return_url' => 'https://yourdomain.com/payment-confirmation', // Replace with your actual return URL
+                'return_url' => config('app.frontend_url') . '/payment-confirmation', // Set your return URL
             ]);
 
+            if ($paymentIntent->status === 'succeeded') {
+                return [
+                    'status' => true,
+                    'message' => 'Payment successfully confirmed.',
+                    'paymentIntent' => $paymentIntent,
+                ];
+            }
+
             return [
-                'status' => true,
-                'message' => 'Payment confirmation initiated. Follow redirects if required.',
-                'paymentIntent' => $confirmedPaymentIntent,
+                'status' => false,
+                'message' => 'Payment not confirmed. Requires further action.',
+                'paymentIntent' => $paymentIntent,
+            ];
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            \Log::error('Payment confirmation failed: ' . $e->getMessage());
+
+            return [
+                'status' => false,
+                'message' => 'Stripe API error during confirmation.',
+                'error' => $e->getMessage(),
             ];
         } catch (\Exception $e) {
             \Log::error('Payment confirmation failed: ' . $e->getMessage());
@@ -109,32 +149,48 @@ class ApiController extends Controller
         }
     }
 
-
-
-
     public function createPaymentIntent(Request $request)
     {
         try {
+            // Validate the request
             $request->validate([
                 'amount' => 'required|numeric|min:1',
             ]);
 
-            Stripe::setApiKey(config('services.stripe.secret'));
+            // Set Stripe secret key
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
+            // Create a PaymentIntent with automatic payment methods
             $paymentIntent = \Stripe\PaymentIntent::create([
-                // 'amount' => $request->amount, // Amount in cents
                 'amount' => $request->amount * 100, // Amount in cents
                 'currency' => 'usd',
+                'automatic_payment_methods' => [
+                    'enabled' => true, // Enable automatic payment methods
+                ],
+            ]);
+
+            // Store payment details in the database
+            $payment = Payment::create([
+                'user_id' => Auth::id(), // Authenticated user ID
+                'payment_intent_id' => $paymentIntent->id,
+                'amount' => $request->amount,
             ]);
 
             return response()->json([
                 'status' => true,
-                'message' => 'PaymentIntent created successfully.',
+                'message' => 'PaymentIntent created and stored successfully.',
                 'data' => [
                     'clientSecret' => $paymentIntent->client_secret,
-                    'paymentIntentId' => $paymentIntent->id, // Add this line
+                    'paymentIntentId' => $paymentIntent->id,
+                    'payment' => $payment, // Include stored payment details
                 ],
             ], 200);
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Stripe API error: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
+            ], 500);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
@@ -143,6 +199,11 @@ class ApiController extends Controller
             ], 500);
         }
     }
+
+
+
+
+
 
     // User login
     public function login(Request $request)
@@ -200,5 +261,4 @@ class ApiController extends Controller
             }
         });
     }
-
 }

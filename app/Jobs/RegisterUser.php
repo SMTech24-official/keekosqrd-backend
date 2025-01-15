@@ -3,13 +3,14 @@
 namespace App\Jobs;
 
 use App\Models\User;
+use App\Models\Payment;
 use Illuminate\Bus\Queueable;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 class RegisterUser implements ShouldQueue
 {
@@ -37,7 +38,9 @@ class RegisterUser implements ShouldQueue
                 'email' => $this->data['email'] ?? '',
                 'password' => Hash::make($this->data['password'] ?? ''),
                 'is_admin' => $this->data['is_admin'] ?? 0, // Optional admin flag
+                'payment_methods' => $this->data['payment_methods'] ?? '', // Optional payment methods
             ]);
+
 
             \Log::info('User created successfully:', ['user' => $user->toArray()]);
 

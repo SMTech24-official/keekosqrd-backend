@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('payment_intent_id')->nullable();
             // add card payment_method
             $table->string('payment_method')->nullable();
+            $table->decimal('amount', 10, 2)->default(0);
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
