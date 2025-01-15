@@ -45,7 +45,10 @@ Route::group([
     Route::post('/user/{id}/update', [ApiController::class, 'update']);
     Route::post("users/active-inactive/{id}", [ApiController::class, "activeInactive"]);
     Route::delete("users/delete/{id}", [ApiController::class, "destroy"]);
+    
     Route::post('/export-users', [ApiController::class, 'exportUsers'])->name('users.export');
+
+    Route::get('/payments/user', [PaymentController::class, 'fetchPayments']);
 
 
     Route::post('/users/search', [ApiController::class, 'search']);

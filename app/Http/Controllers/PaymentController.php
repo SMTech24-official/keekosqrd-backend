@@ -2,75 +2,38 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Stripe\Stripe;
+use App\Models\Payment;
+use Illuminate\Http\Request;
+use App\Traits\HandlesApiResponse;
+use Illuminate\Support\Facades\Auth;
 
 class PaymentController extends Controller
 {
-    public function createPaymentIntent(Request $request)
+    use HandlesApiResponse;
+    public function fetchPayments()
     {
-        try {
-            $request->validate([
-                'amount' => 'required|numeric|min:1',
-            ]);
+        return $this->safeCall(function () {
+            // Fetch authenticated user
+            $user = Auth::user();
 
-            Stripe::setApiKey(config('services.stripe.secret'));
+            // Check if the user is authenticated
+            if (!$user) {
+                return $this->errorResponse('Unauthorized', 401);
+            }
 
-            $paymentIntent = \Stripe\PaymentIntent::create([
-                // 'amount' => $request->amount, // Amount in cents
-                'amount' => $request->amount * 100, // Amount in cents
-                'currency' => 'usd',
-            ]);
+            // Fetch all payments associated with the authenticated user
+            $payments = Payment::where('user_id', $user->id)->get();
 
-            return response()->json([
-                'status' => true,
-                'message' => 'PaymentIntent created successfully.',
-                'data' => [
-                    'clientSecret' => $paymentIntent->client_secret,
-                    'paymentIntentId' => $paymentIntent->id, // Add this line
-                ],
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Failed to create PaymentIntent.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
+            // Check if no payments were found
+            if ($payments->isEmpty()) {
+                return $this->errorResponse('No payments found for this user.', 404);
+            }
 
-    public function confirmPayment(Request $request)
-    {
-        // Validate the incoming request
-        $request->validate([
-            'payment_intent_id' => 'required|string',
-            'payment_method' => 'nullable|string',
-        ]);
-
-        // Set the Stripe API key
-        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
-        try {
-            // Retrieve the PaymentIntent
-            $paymentIntent = \Stripe\PaymentIntent::retrieve($request->payment_intent_id);
-
-            // Confirm the PaymentIntent with a return URL
-            $confirmedPaymentIntent = $paymentIntent->confirm([
-                'payment_method' => $request->payment_method,
-                'return_url' => 'https://yourdomain.com/payment-confirmation', // Replace with your actual return URL
-            ]);
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Payment confirmation initiated. Follow redirects if required.',
-                'paymentIntent' => $confirmedPaymentIntent,
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Payment confirmation failed.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+            return $this->successResponse(
+                'Payments retrieved successfully.',
+                ['payments' => $payments]
+            );
+        });
     }
 }
