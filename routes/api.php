@@ -30,7 +30,7 @@ Route::post('verify-otp', [ApiController::class, 'verifyOtp']);
 Route::post('reset-password', [ApiController::class, 'resetPassword']);
 
 Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
-Route::post('/confirm-payment', [ApiController::class, 'confirmPayment']);
+// Route::post('/confirm-payment', [ApiController::class, 'confirmPayment']);
 
 Route::get('/active-products', [ProductController::class, 'activeProducts'])->name('products.active');
 
@@ -50,6 +50,9 @@ Route::group([
     Route::delete("users/delete/{id}", [ApiController::class, "destroy"]);
 
     Route::post('/export-users', [ApiController::class, 'exportUsers'])->name('users.export');
+
+    Route::post('pause-subscription', [ApiController::class, 'pauseSubscription']);
+    Route::post('resume-subscription', [ApiController::class, 'resumeSubscription']);
 
     Route::get('/payments/user', [PaymentController::class, 'fetchPayments']);
     // add a route to fetch all payments

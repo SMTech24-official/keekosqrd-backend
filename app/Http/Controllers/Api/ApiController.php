@@ -19,13 +19,12 @@ use Illuminate\Foundation\Bus\DispatchesJobs;
 use Stripe\Stripe;
 use Stripe\PaymentMethod;
 use Stripe\PaymentIntent;
+use Stripe\Subscription;
 
 
 class ApiController extends Controller
 {
     use HandlesApiResponse, AuthTrait, DispatchesJobs;
-
-
 
     public function register(Request $request)
     {
@@ -40,8 +39,8 @@ class ApiController extends Controller
                 'address' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:6|confirmed',
-                'payment_intent_id' => 'required|string', // Ensure payment_intent_id is provided
-                'payment_method' => 'required|string',   // Ensure payment_method is provided
+                'payment_intent_id' => 'required|string',
+                'payment_method' => 'required|string',
             ]);
 
             if ($validator->fails()) {
@@ -84,20 +83,24 @@ class ApiController extends Controller
 
             \Log::info('Payment record stored successfully for user:', ['user_id' => $user->id]);
 
+            // Create a recurring subscription for the user
+            $subscription = $this->createSubscription($user, $request);
+
             // Generate a JWT token for the user
             $token = JWTAuth::fromUser($user);
 
             // Log token generation
             \Log::info('JWT token generated successfully.');
 
-            // Return success response with token and user details
+            // Return success response with token, user, and subscription details
             $cookie = cookie('token', $token, 60); // 60 minutes
 
             return $this->successResponse(
-                'User registered successfully.',
+                'User registered and subscription started successfully.',
                 [
                     'token' => $token,
                     'user' => $user->toArray(),
+                    'subscription' => $subscription,
                 ]
             )->cookie($cookie);
         });
@@ -111,10 +114,19 @@ class ApiController extends Controller
             // Retrieve the PaymentIntent
             $paymentIntent = \Stripe\PaymentIntent::retrieve($request->payment_intent_id);
 
+            // Check if the PaymentIntent has already succeeded
+            if ($paymentIntent->status === 'succeeded') {
+                return [
+                    'status' => true,
+                    'message' => 'Payment has already been confirmed.',
+                    'paymentIntent' => $paymentIntent,
+                ];
+            }
+
             // Confirm the PaymentIntent with a return URL
             $paymentIntent = $paymentIntent->confirm([
                 'payment_method' => $request->payment_method,
-                'return_url' => config('app.frontend_url') . '/payment-confirmation', // Set your return URL
+                'return_url' => config('app.frontend_url') . '/payment-confirmation',
             ]);
 
             if ($paymentIntent->status === 'succeeded') {
@@ -149,54 +161,75 @@ class ApiController extends Controller
         }
     }
 
-    public function createPaymentIntent(Request $request)
+
+    private function createSubscription($user, Request $request)
     {
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
         try {
-            // Validate the request
-            $request->validate([
-                'amount' => 'required|numeric|min:1',
+            // Create a Stripe customer for the user
+            $customer = \Stripe\Customer::create([
+                'email' => $user->email,
             ]);
 
-            // Set Stripe secret key
-            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+            \Log::info('Stripe customer created successfully.', ['customer_id' => $customer->id]);
 
-            // Create a PaymentIntent with automatic payment methods
-            $paymentIntent = \Stripe\PaymentIntent::create([
-                'amount' => $request->amount * 100, // Amount in cents
-                'currency' => 'usd',
-                'automatic_payment_methods' => [
-                    'enabled' => true, // Enable automatic payment methods
+            // Retrieve the PaymentMethod instance
+            $paymentMethod = \Stripe\PaymentMethod::retrieve($request->payment_method);
+
+            // Attach the payment method to the customer
+            $paymentMethod->attach([
+                'customer' => $customer->id,
+            ]);
+
+            \Log::info('Payment method attached successfully.', ['payment_method_id' => $paymentMethod->id]);
+
+            // Fetch the payment methods attached to the customer
+            $attachedPaymentMethods = \Stripe\PaymentMethod::all([
+                'customer' => $customer->id,
+                'type' => 'card',
+            ]);
+
+            if (count($attachedPaymentMethods->data) > 0) {
+                $attachedPaymentMethodId = $attachedPaymentMethods->data[0]->id; // Use the first attached payment method
+            } else {
+                \Log::error('No payment methods found for customer.', ['customer_id' => $customer->id]);
+                return null; // Handle gracefully
+            }
+
+            \Log::info('Using attached payment method for subscription.', ['payment_method_id' => $attachedPaymentMethodId]);
+
+            // Set the default payment method for the customer
+            \Stripe\Customer::update($customer->id, [
+                'invoice_settings' => [
+                    'default_payment_method' => $attachedPaymentMethodId,
                 ],
             ]);
 
-            // Store payment details in the database
-            $payment = Payment::create([
-                'user_id' => Auth::id(), // Authenticated user ID
-                'payment_intent_id' => $paymentIntent->id,
-                'amount' => $request->amount,
+            \Log::info('Default payment method updated for customer.', ['customer_id' => $customer->id]);
+
+            // Create the subscription with custom price data
+            $subscription = \Stripe\Subscription::create([
+                'customer' => $customer->id,
+                'items' => [
+                    [
+                        'price_data' => [
+                            'currency' => 'usd',
+                            'product' => 'prod_Rb1UGp5GFLTBZk', // Replace with your actual product ID from Stripe
+                            'recurring' => ['interval' => 'month'], // Define the subscription interval (e.g., month or year)
+                            'unit_amount' => $request->amount * 100, // Amount from `createPaymentIntent` in cents
+                        ],
+                    ],
+                ],
+                'expand' => ['latest_invoice.payment_intent'],
             ]);
 
-            return response()->json([
-                'status' => true,
-                'message' => 'PaymentIntent created and stored successfully.',
-                'data' => [
-                    'clientSecret' => $paymentIntent->client_secret,
-                    'paymentIntentId' => $paymentIntent->id,
-                    'payment' => $payment, // Include stored payment details
-                ],
-            ], 200);
-        } catch (\Stripe\Exception\ApiErrorException $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Stripe API error: ' . $e->getMessage(),
-                'error' => $e->getMessage(),
-            ], 500);
+            \Log::info('Subscription created successfully.', ['subscription_id' => $subscription->id]);
+
+            return $subscription;
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Failed to create PaymentIntent.',
-                'error' => $e->getMessage(),
-            ], 500);
+            \Log::error('Subscription creation failed: ' . $e->getMessage());
+            return null;
         }
     }
 
@@ -205,36 +238,134 @@ class ApiController extends Controller
 
 
 
-    // User login
+
+    public function pauseSubscription(Request $request)
+    {
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+        try {
+            // Retrieve the subscription ID from the request
+            $subscriptionId = $request->input('subscription_id');
+
+            // Update the subscription to pause collection
+            $subscription = \Stripe\Subscription::update(
+                $subscriptionId, // Pass the subscription ID
+                [
+                    'pause_collection' => [
+                        'behavior' => 'keep_as_draft', // Options: 'keep_as_draft', 'mark_uncollectible', or 'void'
+                    ],
+                ]
+            );
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Subscription paused successfully.',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to pause subscription: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to pause subscription.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
+
+    public function resumeSubscription(Request $request)
+    {
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+        try {
+            // Retrieve the subscription ID from the request
+            $subscriptionId = $request->input('subscription_id');
+
+            // Update the subscription to clear the pause_collection
+            $subscription = \Stripe\Subscription::update(
+                $subscriptionId, // Pass the subscription ID
+                [
+                    'pause_collection' => null, // Clear pause_collection to resume
+                ]
+            );
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Subscription resumed successfully.',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to resume subscription: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to resume subscription.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
+    public function createPaymentIntent(Request $request)
+    {
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+        try {
+            // Fetch the price dynamically from Stripe using the Price ID
+            $price = \Stripe\Price::retrieve('price_1QhpRzDgYV6zJ17vbxoBnokH'); // Replace with your Stripe Price ID
+
+            // Create a PaymentIntent using the dynamic price
+            $paymentIntent = \Stripe\PaymentIntent::create([
+                'amount' => $price->unit_amount, // Amount is fetched directly from the Price object (in cents)
+                'currency' => $price->currency, // Currency is fetched from the Price object
+                'payment_method_types' => ['card'], // Accept card payments
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'PaymentIntent created successfully',
+                'data' => [
+                    'client_secret' => $paymentIntent->client_secret,
+                    'payment_intent_id' => $paymentIntent->id,
+                    'amount' => $price->unit_amount / 100, // Convert cents to dollars
+                    'currency' => $price->currency,
+                ],
+            ]);
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            \Log::error('Failed to create PaymentIntent: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to create PaymentIntent',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
     public function login(Request $request)
     {
         return $this->safeCall(function () use ($request) {
             $credentials = $request->only('email', 'password');
 
             $job = new LoginUser($credentials);
-            $result = $job->handle(); // Directly call the handle method
+            $result = $job->handle();
 
-            // Handle errors from the job
             if (isset($result['error'])) {
                 return $this->errorResponse($result['error'], $result['status_code'] ?? 400);
             }
 
-            // Generate cookie
             $cookie = cookie('token', $result['token'], 10080); // 10080 minutes (7 days)
 
-            // Return success response
             return $this->successResponse(
                 'Login successful',
                 [
                     'token' => $result['token'],
-                    'user' => $result['user']
+                    'user' => $result['user'],
                 ]
             )->cookie($cookie);
         });
     }
 
-
-    // Get authenticated user
     public function getUser()
     {
         return $this->safeCall(function () {

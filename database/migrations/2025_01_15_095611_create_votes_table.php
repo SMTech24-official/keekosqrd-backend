@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
             $table->unsignedInteger('votes')->default(1); // Default votes count to 1
-            // add status column
             $table->boolean('status')->default(false);
             $table->timestamps();
         });
