@@ -233,12 +233,6 @@ class ApiController extends Controller
         }
     }
 
-
-
-
-
-
-
     public function pauseSubscription(Request $request)
     {
         \Stripe\Stripe::setApiKey(config('services.stripe.secret'));

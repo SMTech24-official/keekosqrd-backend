@@ -282,4 +282,20 @@ class VoteController extends Controller
 
         return response()->stream($callback, 200, $headers);
     }
+
+   public function votingHistory()
+   {
+    return $this->safeCall(function () {
+
+        if (!Auth::check()) {
+            return $this->errorResponse('You are not authorized to perform this action.', 403);
+        }
+
+        $votes = Vote::where('user_id', Auth::user()->id)
+            ->with('product')
+            ->get();
+
+        return $this->successResponse('Voting history retrieved successfully.', ['votes' => $votes]);
+    });
+   }
 }

@@ -48,7 +48,8 @@ Route::group([
     Route::post('/user/{id}/update', [ApiController::class, 'update']);
     Route::post("users/active-inactive/{id}", [ApiController::class, "activeInactive"]);
     Route::delete("users/delete/{id}", [ApiController::class, "destroy"]);
-
+    // add route for user own voting history
+    Route::get('users/voting-history',[VoteController::class, 'votingHistory']);
     Route::post('/export-users', [ApiController::class, 'exportUsers'])->name('users.export');
 
     Route::post('pause-subscription', [ApiController::class, 'pauseSubscription']);
