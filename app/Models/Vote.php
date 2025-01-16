@@ -12,6 +12,7 @@ class Vote extends Model
         'user_id',
         'product_id',
         'votes',
+        'status',
     ];
 
     /**
