@@ -69,7 +69,7 @@ Route::group([
 
     Route::get('/votes/export/{month}/{year}', [VoteController::class, 'exportVotes']);
     // add a route to select winers
-    Route::post('make-winer/{id}', [VoteController::class, 'makeWiner']);
+    Route::post('make-winer/{id}/{month}/{year}', [VoteController::class, 'makeWiner']);
     // add a route to get a list of all winers
     Route::get('/winers', [VoteController::class, 'winers']);
     Route::get('export-winers', [VoteController::class, 'exportWiners']);

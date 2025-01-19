@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Product;
 use App\Models\User;
 use App\Models\Vote;
+use App\Mail\VoteMail;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use App\Traits\HandlesApiResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class VoteController extends Controller
 {
@@ -86,41 +88,96 @@ class VoteController extends Controller
         });
     }
 
-    public function makeWiner(Request $request, $id)
+    // public function makeWiner(Request $request, $id)
+    // {
+    //     return $this->safeCall(function () use ($request, $id) {
+    //         // Validate the request data
+    //         $data = $request->validate([
+    //             'status' => 'required|boolean',
+    //         ]);
+
+    //         // Check if the user is authenticated
+    //         if (!Auth::check()) {
+    //             return $this->errorResponse('You are not authorized to perform this action.', 403);
+    //         }
+
+    //         // Check if the user is an admin
+    //         $user = Auth::user();
+
+    //         if (!$user->is_admin) {
+    //             return $this->errorResponse('You are not authorized to perform this action.', 403);
+    //         }
+
+    //         // Find the vote by ID
+    //         $vote = Vote::find($id);
+
+    //         if (!$vote) {
+    //             return $this->errorResponse('Vote not found.', 404);
+    //         }
+
+    //         // Update the status of the vote
+    //         $vote->update(['status' => $data['status']]);
+
+
+    //         return $this->successResponse(
+    //             'Status updated successfully.',
+    //             ['status' => $vote]
+    //         );
+    //     });
+    // }
+
+    public function makeWiner(Request $request, $id, $month, $year)
     {
-        return $this->safeCall(function () use ($request, $id) {
-            // Validate the request data
+        try {
+            // Validate the request
             $data = $request->validate([
                 'status' => 'required|boolean',
             ]);
 
-            // Check if the user is authenticated
-            if (!Auth::check()) {
-                return $this->errorResponse('You are not authorized to perform this action.', 403);
+            // Ensure the user is authenticated and authorized (admin)
+            $user = Auth::user();
+            if (!$user || !$user->is_admin) {
+                return response()->json(['error' => 'Unauthorized action.'], 403);
             }
 
-            // Check if the user is an admin
-            $user = Auth::user();
+            // Check if a winner already exists for the given month and year
+            $existingWinner = Vote::where('status', true)
+                ->whereMonth('created_at', $month)
+                ->whereYear('created_at', $year)
+                ->first();
 
-            if (!$user->is_admin) {
-                return $this->errorResponse('You are not authorized to perform this action.', 403);
+            if ($existingWinner) {
+                return response()->json([
+                    'error' => 'A winner has already been selected for this month and year.'
+                ], 400);
             }
 
             // Find the vote by ID
             $vote = Vote::find($id);
-
             if (!$vote) {
-                return $this->errorResponse('Vote not found.', 404);
+                return response()->json(['error' => 'Vote not found.'], 404);
             }
 
-            // Update the status of the vote
+            // Update the vote status to make this user the winner
             $vote->update(['status' => $data['status']]);
 
-            return $this->successResponse(
-                'Status updated successfully.',
-                ['status' => $vote]
-            );
-        });
+            // Fetch the winner and product details
+            $winner = User::find($vote->user_id);
+            $product = Product::find($vote->product_id);
+
+            if (!$winner || !$product) {
+                return response()->json(['error' => 'Winner or product details not found.'], 404);
+            }
+
+            // Send an email to the winner
+            Mail::to($winner->email)->send(new VoteMail($winner, $product, $vote));
+
+            return response()->json(['message' => 'Winner selected and email sent successfully.'], 200);
+        } catch (\Exception $e) {
+            // Log the error and return an appropriate response
+            \Log::error('Error in makeWiner method: ' . $e->getMessage());
+            return response()->json(['error' => 'An error occurred. Please try again later.'], 500);
+        }
     }
 
     public function winers()
@@ -283,19 +340,19 @@ class VoteController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-   public function votingHistory()
-   {
-    return $this->safeCall(function () {
+    public function votingHistory()
+    {
+        return $this->safeCall(function () {
 
-        if (!Auth::check()) {
-            return $this->errorResponse('You are not authorized to perform this action.', 403);
-        }
+            if (!Auth::check()) {
+                return $this->errorResponse('You are not authorized to perform this action.', 403);
+            }
 
-        $votes = Vote::where('user_id', Auth::user()->id)
-            ->with('product')
-            ->get();
+            $votes = Vote::where('user_id', Auth::user()->id)
+                ->with('product')
+                ->get();
 
-        return $this->successResponse('Voting history retrieved successfully.', ['votes' => $votes]);
-    });
-   }
+            return $this->successResponse('Voting history retrieved successfully.', ['votes' => $votes]);
+        });
+    }
 }
