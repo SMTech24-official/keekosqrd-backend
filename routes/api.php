@@ -3,80 +3,63 @@
 use App\Models\Payment;
 use App\Models\ChatTitle;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\BlogController;
-use App\Http\Controllers\ChatController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoteController;
-use App\Http\Controllers\OrfaAIController;
 use App\Http\Controllers\Api\ApiController;
-use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\FeedbackController;
-use App\Http\Controllers\ChatTitleController;
-use App\Http\Controllers\CaseExampleController;
-use App\Http\Controllers\ContactFormController;
-use App\Http\Controllers\TestimonialController;
-use App\Http\Controllers\TransactionController;
-
-// use App\Jobs\TestJob;
 
 
+// Route::post("register", [ApiController::class, "register"]);
+Route::post('/register', [ApiController::class, 'register'])->name('api.register');
 
-Route::post("register", [ApiController::class, "register"]);
 Route::post("login", [ApiController::class, "login"]);
 Route::post('forgot-password', [ApiController::class, 'forgotPassword']);
 Route::post('verify-otp', [ApiController::class, 'verifyOtp']);
 Route::post('reset-password', [ApiController::class, 'resetPassword']);
 
-Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
 // Route::post('/confirm-payment', [ApiController::class, 'confirmPayment']);
 
 Route::get('/active-products', [ProductController::class, 'activeProducts'])->name('products.active');
+Route::get('/products', [ProductController::class, 'index'])->name('products.index'); // Retrieve all products
+
 
 
 Route::group([
     "middleware" => ["auth:api"]
 ], function () {
 
+    Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
+    Route::post('/subscribe', [ApiController::class, 'subscribe'])->name('api.subscribe');
+
+
     Route::patch('/users/{user}/approve', [ApiController::class, 'approveUser']);
 
     Route::get("users", [ApiController::class, "users"]);
     Route::post("users/create", [ApiController::class, "store"]);
     Route::get("users/show", [ApiController::class, "getAllUsers"]);
-    Route::get("user/{id}", [ApiController::class, "show"]);
+    Route::get("user", [ApiController::class, "show"]);
     Route::post('/user/{id}/update', [ApiController::class, 'update']);
     Route::post("users/active-inactive/{id}", [ApiController::class, "activeInactive"]);
     Route::delete("users/delete/{id}", [ApiController::class, "destroy"]);
-    // add route for user own voting history
-    Route::get('users/voting-history',[VoteController::class, 'votingHistory']);
+    Route::get('users/voting-history', [VoteController::class, 'votingHistory']);
     Route::post('/export-users', [ApiController::class, 'exportUsers'])->name('users.export');
 
     Route::post('pause-subscription', [ApiController::class, 'pauseSubscription']);
     Route::post('resume-subscription', [ApiController::class, 'resumeSubscription']);
 
     Route::get('/payments/user', [PaymentController::class, 'fetchPayments']);
-    // add a route to fetch all payments
-    Route::get('/payments', [PaymentController::class, 'index']);
-    // add a route to get total amount of payments
-    Route::get('/payments/total/{month}/{year}', [PaymentController::class, 'totalPayments']);
-    // add a route to get total memebers
-    Route::get('/total-members/{month}/{year}', [PaymentController::class, 'totalMembers']);
-    // add a route to get total perticipants of voters
-    Route::get('/total-voters/{month}/{year}', [VoteController::class, 'totalVoters']);
+    Route::get('/payments/{month}/{year}', [PaymentController::class, 'index']);
+    Route::get('/payments/total', [PaymentController::class, 'totalPayments']);
+    Route::get('/total-members', [PaymentController::class, 'totalMembers']);
+    Route::get('/total-voters', [VoteController::class, 'totalVoters']);
 
     Route::get('/votes/{month}/{year}', [VoteController::class, 'index']);
 
     Route::get('/votes/export/{month}/{year}', [VoteController::class, 'exportVotes']);
-    // add a route to select winers
     Route::post('make-winer/{id}/{month}/{year}', [VoteController::class, 'makeWiner']);
-    // add a route to get a list of all winers
     Route::get('/winers', [VoteController::class, 'winers']);
     Route::get('export-winers', [VoteController::class, 'exportWiners']);
-
-
-
-
 
     Route::post('/users/search', [ApiController::class, 'search']);
 
@@ -85,14 +68,13 @@ Route::group([
     Route::get("refresh-token", [ApiController::class, "refreshToken"]);
     Route::get("logout", [ApiController::class, "logout"]);
 
-    // Product CRUD routes
-    Route::get('/products', [ProductController::class, 'index'])->name('products.index'); // Retrieve all products
     Route::post('/products', [ProductController::class, 'store'])->name('products.store'); // Create a new product
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show'); // Retrieve a single product
     Route::post('/products/update/{id}', [ProductController::class, 'update'])->name('products.update');
 
     Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('products.destroy'); // Delete a product
-    // make a route to get a list of all active products
 
     Route::post('/products/{id}/vote', [ProductController::class, 'vote']);
+
+    Route::post('/stripe/payment', [ApiController::class, 'stripePayment']);
 });

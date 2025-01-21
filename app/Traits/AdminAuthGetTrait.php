@@ -137,9 +137,9 @@ trait AdminAuthGetTrait
         ]);
     }
 
-    public function show($id)
+    public function show()
     {
-        return $this->safeCall(function () use ($id) {
+        return $this->safeCall(function () {
             // Ensure the user is authenticated
             if (!Auth::check()) {
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
@@ -148,17 +148,13 @@ trait AdminAuthGetTrait
             // Fetch the authenticated user
             $authenticatedUser = Auth::user();
 
-            // Check if the authenticated user matches the requested user ID
-            if ($authenticatedUser->id != $id) {
-                return $this->errorResponse('You are not authorized to access this profile.', 403);
-            }
-
             return $this->successResponse(
                 'User retrieved successfully',
                 ['user' => $authenticatedUser]
             );
         });
     }
+
 
     public function update(Request $request, $id)
     {

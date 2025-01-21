@@ -13,17 +13,26 @@ class PaymentController extends Controller
 {
     use HandlesApiResponse;
 
-    public function index()
+    public function index($month, $year)
     {
-        return $this->safeCall(function () {
-            // add user must be is_admin
+        return $this->safeCall(function () use ($month, $year) {
+            // Fetch the authenticated user
             $user = Auth::user();
 
-            if (!$user->is_admin) {
+            // Check if the user is an admin
+            if (!$user || !$user->is_admin) {
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
-            // Fetch all payments
-            $payments = Payment::all();
+
+            // Fetch all payments for the given month and year
+            $payments = Payment::whereMonth('created_at', $month)
+                ->whereYear('created_at', $year)
+                ->get();
+
+            // Check if no payments were found
+            if ($payments->isEmpty()) {
+                return $this->errorResponse('No payments found for the specified period.', 404);
+            }
 
             return $this->successResponse(
                 'Payments retrieved successfully.',
@@ -32,27 +41,23 @@ class PaymentController extends Controller
         });
     }
 
-    public function totalPayments($month, $year)
+
+    public function totalPayments()
     {
-        return $this->safeCall(function () use ($month, $year) {
-            // Check if the user is an admin
+        return $this->safeCall(function () {
+            // Fetch the authenticated user
             $user = Auth::user();
 
-            if (!$user->is_admin) {
+            // Check if the user is an admin
+            if (!$user || !$user->is_admin) {
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
 
-            // Validate the month parameter
-            if (!is_numeric($month) || $month < 1 || $month > 12) {
-                return $this->errorResponse('Invalid month provided.', 400);
-            }
+            // Get the current month and year
+            $month = date('m');
+            $year = date('Y');
 
-            // Validate the year parameter
-            if (!is_numeric($year) || $year < 1900 || $year > date('Y')) {
-                return $this->errorResponse('Invalid year provided.', 400);
-            }
-
-            // Fetch total amount of payments for the given month and year
+            // Fetch total amount of payments for the current month and year
             $totalPayments = Payment::whereYear('created_at', $year)
                 ->whereMonth('created_at', $month)
                 ->sum('amount');
@@ -65,27 +70,23 @@ class PaymentController extends Controller
     }
 
 
-    public function totalMembers($month, $year)
+
+    public function totalMembers()
     {
-        return $this->safeCall(function () use ($month, $year) {
-            // Check if the user is an admin
+        return $this->safeCall(function () {
+            // Fetch the authenticated user
             $user = Auth::user();
 
-            if (!$user->is_admin) {
+            // Check if the user is an admin
+            if (!$user || !$user->is_admin) {
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
 
-            // Validate the month parameter
-            if (!is_numeric($month) || $month < 1 || $month > 12) {
-                return $this->errorResponse('Invalid month provided.', 400);
-            }
+            // Get the current month and year
+            $month = date('m');
+            $year = date('Y');
 
-            // Validate the year parameter
-            if (!is_numeric($year) || $year < 1900 || $year > date('Y')) {
-                return $this->errorResponse('Invalid year provided.', 400);
-            }
-
-            // Fetch total number of members for the given month and year
+            // Fetch the total number of members for the current month and year
             $totalMembers = Payment::whereYear('created_at', $year)
                 ->whereMonth('created_at', $month)
                 ->count();
@@ -98,7 +99,8 @@ class PaymentController extends Controller
     }
 
 
-    
+
+
 
     public function fetchPayments()
     {
@@ -116,7 +118,7 @@ class PaymentController extends Controller
 
             // Check if no payments were found
             if ($payments->isEmpty()) {
-                return $this->errorResponse('No payments found for this user.', 404);
+                return $this->errorResponse('No payments found.', 404);
             }
 
             return $this->successResponse(

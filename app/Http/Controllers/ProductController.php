@@ -71,7 +71,7 @@ class ProductController extends Controller
     public function index()
     {
         return $this->safeCall(function () {
-            $products = Product::all();
+            $products = Product::paginate(10);
             return $this->successResponse('Products retrieved successfully', [
                 'products' => $products
             ]);

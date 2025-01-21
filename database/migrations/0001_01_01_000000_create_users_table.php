@@ -28,6 +28,8 @@ return new class extends Migration
             $table->timestamp('last_login_at')->nullable(); // Add last_login_at column
             $table->string('status')->nullable()->default('active');
             $table->json('payment_method')->nullable()->default(null);
+            $table->string('stripe_customer_id')->nullable();
+            $table->string('subscription_id')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });

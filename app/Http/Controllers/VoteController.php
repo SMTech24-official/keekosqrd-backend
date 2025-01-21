@@ -57,26 +57,22 @@ class VoteController extends Controller
         });
     }
 
-    public function totalVoters($month, $year)
+    public function totalVoters()
     {
-        return $this->safeCall(function () use ($month, $year) {
-            // Check if the user is an admin
+        return $this->safeCall(function () {
+            // Fetch the authenticated user
             $user = Auth::user();
 
-            if (!$user->is_admin) {
+            // Check if the user is an admin
+            if (!$user || !$user->is_admin) {
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
 
-            // Validate the month parameter
-            if (!is_numeric($month) || $month < 1 || $month > 12) {
-                return $this->errorResponse('Invalid month provided.', 400);
-            }
+            // Get the current month and year
+            $month = date('m');
+            $year = date('Y');
 
-            // Validate the year parameter
-            if (!is_numeric($year) || $year < 1900 || $year > date('Y')) {
-                return $this->errorResponse('Invalid year provided.', 400);
-            }
-
+            // Fetch the total number of voters for the current month and year
             $totalVoters = Vote::whereYear('created_at', $year)
                 ->whereMonth('created_at', $month)
                 ->count();
@@ -87,6 +83,7 @@ class VoteController extends Controller
             );
         });
     }
+
 
     // public function makeWiner(Request $request, $id)
     // {
