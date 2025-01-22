@@ -8,6 +8,7 @@ use App\Http\Controllers\VoteController;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SubscriptionController;
 
 
 // Route::post("register", [ApiController::class, "register"]);
@@ -21,7 +22,7 @@ Route::post('reset-password', [ApiController::class, 'resetPassword']);
 // Route::post('/confirm-payment', [ApiController::class, 'confirmPayment']);
 
 Route::get('/active-products', [ProductController::class, 'activeProducts'])->name('products.active');
-Route::get('/products', [ProductController::class, 'index'])->name('products.index'); // Retrieve all products
+Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 
 
 
@@ -29,11 +30,16 @@ Route::group([
     "middleware" => ["auth:api"]
 ], function () {
 
+    Route::post('/register-subscription',[SubscriptionController::class, 'registerSubscription']);
+
     Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
     Route::post('/subscribe', [ApiController::class, 'subscribe'])->name('api.subscribe');
 
 
     Route::patch('/users/{user}/approve', [ApiController::class, 'approveUser']);
+
+    Route::get('user/votes', [VoteController::class, 'userVotes']);
+    Route::get('user/winers', [VoteController::class, 'userWiners']);
 
     Route::get("users", [ApiController::class, "users"]);
     Route::post("users/create", [ApiController::class, "store"]);

@@ -84,6 +84,50 @@ class VoteController extends Controller
         });
     }
 
+    public function userVotes()
+    {
+        return $this->safeCall(function () {
+            // Fetch the authenticated user
+            $user = Auth::user();
+            if (!$user) {
+                return $this->errorResponse('You are not authorized to perform this action.', 403);
+            }
+
+            // Calculate the sum of votes for the authenticated user
+            $totalVotes = Vote::where('user_id', $user->id)->sum('votes');
+
+            if ($totalVotes === 0) {
+                return $this->successResponse('No votes found.', ['total_votes' => 0]);
+            }
+
+            return $this->successResponse(
+                'Total votes retrieved successfully.',
+                ['total_votes' => $totalVotes]
+            );
+        });
+    }
+
+    public function userWiners()
+    {
+        return $this->safeCall(function () {
+            // Fetch the authenticated user
+            $user = Auth::user();
+            if (!$user) {
+                return $this->errorResponse('You are not authorized to perform this action.', 403);
+            }
+
+            // Count the number of votes where status is 1 for the authenticated user
+            $voteCount = Vote::where('user_id', $user->id)
+                ->where('status', 1)
+                ->count();
+
+            return $this->successResponse(
+                'Total Winer retrieved successfully.',
+                ['total_winer' => $voteCount]
+            );
+        });
+    }
+
 
     // public function makeWiner(Request $request, $id)
     // {

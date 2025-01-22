@@ -14,11 +14,12 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable();
-            // add payment_intent_id
             $table->string('payment_intent_id')->nullable();
-            // add card payment_method
             $table->string('payment_method')->nullable();
             $table->decimal('amount', 10, 2)->default(0);
+            $table->string('stripe_customer_id')->nullable();
+            $table->string('subscription_id')->nullable();
+            $table->string('status')->nullable();
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
