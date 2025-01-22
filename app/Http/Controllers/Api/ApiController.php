@@ -82,6 +82,7 @@ class ApiController extends Controller
         });
     }
 
+    // working 6.22
     public function createPaymentIntent(Request $request)
     {
         \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
@@ -89,22 +90,19 @@ class ApiController extends Controller
         try {
             $user = auth()->user();
 
-            // Check if the user already has a Stripe customer ID
+            // Ensure the user has a Stripe customer ID
             if (!$user->stripe_customer_id) {
-                // Create a new Stripe customer
                 $customer = \Stripe\Customer::create([
                     'email' => $user->email,
-                    'name' => $user->name, // Assuming 'name' exists in your user table
+                    'name' => "{$user->first_name} {$user->last_name}",
                 ]);
-
-                // Save the Stripe customer ID to the user
                 $user->stripe_customer_id = $customer->id;
                 $user->save();
             }
 
             // Validate the request
             $validator = Validator::make($request->all(), [
-                'payment_method' => 'required|string', // Ensure payment method is passed
+                'payment_method' => 'required|string',
             ]);
 
             if ($validator->fails()) {
@@ -115,46 +113,35 @@ class ApiController extends Controller
                 ], 400);
             }
 
-            // Attach the payment method to the customer
-            $paymentMethod = \Stripe\PaymentMethod::retrieve($request->payment_method);
-            $paymentMethod->attach(['customer' => $user->stripe_customer_id]);
-
-            // Set the payment method as the default for the customer
-            \Stripe\Customer::update($user->stripe_customer_id, [
-                'invoice_settings' => [
-                    'default_payment_method' => $request->payment_method,
-                ],
-            ]);
-
-            // Fetch the price dynamically from Stripe using the Price ID
-            $price = \Stripe\Price::retrieve('price_1QhpRzDgYV6zJ17vbxoBnokH'); // Replace with your Stripe Price ID
-
             // Create a PaymentIntent
+            $price = \Stripe\Price::retrieve('price_1QhpRzDgYV6zJ17vbxoBnokH'); // Replace with your Price ID
+
             $paymentIntent = \Stripe\PaymentIntent::create([
-                'amount' => $price->unit_amount, // Amount in cents
-                'currency' => $price->currency, // Currency from the Price object
-                'customer' => $user->stripe_customer_id, // Link to the Stripe customer
+                'amount' => $price->unit_amount,
+                'currency' => $price->currency,
+                'payment_method' => $request->payment_method,
+                'customer' => $user->stripe_customer_id,
+                'payment_method_types' => ['card'],
+                'setup_future_usage' => 'off_session', // Save for future payments
             ]);
 
-            // Store the payment details in the payments table
-            $payment = Payment::create([
+            // Save the payment details to the database
+            Payment::create([
                 'user_id' => $user->id,
                 'payment_intent_id' => $paymentIntent->id,
                 'payment_method' => $request->payment_method,
                 'stripe_customer_id' => $user->stripe_customer_id,
-                'amount' => $price->unit_amount / 100, // Convert cents to dollars
-                'subscription_id' => null, // Add subscription ID if applicable in future
+                'amount' => $price->unit_amount / 100,
                 'status' => $paymentIntent->status,
             ]);
 
-            // Return the desired response format
             return response()->json([
                 'status' => true,
-                'message' => 'PaymentIntent created successfully',
+                'message' => 'PaymentIntent created successfully.',
                 'data' => [
                     'client_secret' => $paymentIntent->client_secret,
                     'payment_intent_id' => $paymentIntent->id,
-                    'amount' => $price->unit_amount / 100, // Convert cents to dollars
+                    'amount' => $price->unit_amount / 100,
                     'currency' => $price->currency,
                 ],
             ]);
@@ -162,7 +149,7 @@ class ApiController extends Controller
             \Log::error('Failed to create PaymentIntent: ' . $e->getMessage());
             return response()->json([
                 'status' => false,
-                'message' => 'Failed to create PaymentIntent',
+                'message' => 'Failed to create PaymentIntent.',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -247,7 +234,8 @@ class ApiController extends Controller
     //     }
     // }
 
-    // working 2.05 pm
+
+    // Working 6.22
     public function subscribe(Request $request)
     {
         \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
@@ -266,22 +254,24 @@ class ApiController extends Controller
                 ], 400);
             }
 
-            // Fetch the latest payment record for the authenticated user
+            // Fetch the authenticated user
             $user = Auth::user();
+
+            // Retrieve the latest payment record for the user
             $payment = Payment::where('user_id', $user->id)->latest()->first();
 
-            if (!$payment || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
+            if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'Payment, customer ID, or payment intent ID not found.',
+                    'message' => 'No valid payment method, customer ID, or payment intent found for the user.',
                 ], 404);
             }
 
-            // Confirm the PaymentIntent using the ID from the database
+            // Retrieve and confirm the payment intent from Stripe
             $paymentIntent = \Stripe\PaymentIntent::retrieve($payment->payment_intent_id);
 
             if ($paymentIntent->status === 'requires_confirmation') {
-                $paymentIntent->confirm();
+                $paymentIntent = $paymentIntent->confirm();
 
                 if ($paymentIntent->status !== 'succeeded') {
                     return response()->json([
@@ -294,7 +284,18 @@ class ApiController extends Controller
                 }
             }
 
-            // Create a subscription using the Stripe API
+            // Attach the payment method to the customer
+            $paymentMethod = \Stripe\PaymentMethod::retrieve($payment->payment_method);
+            $paymentMethod->attach(['customer' => $payment->stripe_customer_id]);
+
+            // Set the payment method as the default for the customer
+            \Stripe\Customer::update($payment->stripe_customer_id, [
+                'invoice_settings' => [
+                    'default_payment_method' => $payment->payment_method,
+                ],
+            ]);
+
+            // Create a subscription
             $subscription = \Stripe\Subscription::create([
                 'customer' => $payment->stripe_customer_id,
                 'items' => [
@@ -302,16 +303,14 @@ class ApiController extends Controller
                         'price' => $request->price_id,
                     ],
                 ],
-                'expand' => ['latest_invoice.payment_intent'],
             ]);
 
-            // Update the payment record in the database with subscription details
+            // Save subscription details to the database
             $payment->update([
                 'subscription_id' => $subscription->id,
                 'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
             ]);
 
-            // Update the user's subscription details
             $user->update([
                 'subscription_id' => $subscription->id,
             ]);
@@ -328,11 +327,100 @@ class ApiController extends Controller
             \Log::error('Failed to create subscription: ' . $e->getMessage());
             return response()->json([
                 'status' => false,
-                'message' => 'Failed to create subscription',
+                'message' => 'Failed to create subscription.',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
+
+
+
+    // working 2.38 pm
+    // public function subscribe(Request $request)
+    // {
+    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+    //     try {
+    //         // Validate the request
+    //         $validator = Validator::make($request->all(), [
+    //             'price_id' => 'required|string', // Price ID is required
+    //         ]);
+
+    //         if ($validator->fails()) {
+    //             return response()->json([
+    //                 'status' => false,
+    //                 'message' => 'Validation error',
+    //                 'errors' => $validator->errors(),
+    //             ], 400);
+    //         }
+
+    //         // Fetch the latest payment record for the authenticated user
+    //         $user = Auth::user();
+    //         $payment = Payment::where('user_id', $user->id)->latest()->first();
+
+    //         if (!$payment || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
+    //             return response()->json([
+    //                 'status' => false,
+    //                 'message' => 'Payment, customer ID, or payment intent ID not found.',
+    //             ], 404);
+    //         }
+
+    //         // Confirm the PaymentIntent using the ID from the database
+    //         $paymentIntent = \Stripe\PaymentIntent::retrieve($payment->payment_intent_id);
+
+    //         if ($paymentIntent->status === 'requires_confirmation') {
+    //             $paymentIntent->confirm();
+
+    //             if ($paymentIntent->status !== 'succeeded') {
+    //                 return response()->json([
+    //                     'status' => false,
+    //                     'message' => 'Payment could not be completed.',
+    //                     'data' => [
+    //                         'payment_intent_status' => $paymentIntent->status,
+    //                     ],
+    //                 ], 402);
+    //             }
+    //         }
+
+    //         // Create a subscription using the Stripe API
+    //         $subscription = \Stripe\Subscription::create([
+    //             'customer' => $payment->stripe_customer_id,
+    //             'items' => [
+    //                 [
+    //                     'price' => $request->price_id,
+    //                 ],
+    //             ],
+    //             'expand' => ['latest_invoice.payment_intent'],
+    //         ]);
+
+    //         // Update the payment record in the database with subscription details
+    //         $payment->update([
+    //             'subscription_id' => $subscription->id,
+    //             'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
+    //         ]);
+
+    //         // Update the user's subscription details
+    //         $user->update([
+    //             'subscription_id' => $subscription->id,
+    //         ]);
+
+    //         return response()->json([
+    //             'status' => true,
+    //             'message' => 'Subscription created and payment confirmed successfully.',
+    //             'data' => [
+    //                 'subscription_id' => $subscription->id,
+    //                 'status' => $subscription->status,
+    //             ],
+    //         ]);
+    //     } catch (\Stripe\Exception\ApiErrorException $e) {
+    //         \Log::error('Failed to create subscription: ' . $e->getMessage());
+    //         return response()->json([
+    //             'status' => false,
+    //             'message' => 'Failed to create subscription',
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     public function pauseSubscription(Request $request)
     {
