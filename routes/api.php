@@ -79,6 +79,8 @@ Route::group([
     Route::post('/products/update/{id}', [ProductController::class, 'update'])->name('products.update');
 
     Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('products.destroy'); // Delete a product
+    // make product active
+    Route::post('/products/{id}/active', [ProductController::class, 'productActive']);
 
     Route::post('/products/{id}/vote', [ProductController::class, 'vote']);
 
