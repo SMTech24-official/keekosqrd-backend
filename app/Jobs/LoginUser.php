@@ -51,6 +51,7 @@ class LoginUser implements ShouldQueue
 
             // Create token with claims
             $token = JWTAuth::claims([
+                'iss' => config('app.url') . '/api/login', // Ensure app URL is correct
                 'role' => $user->is_admin ? 'admin' : 'user',
             ])->fromUser($user);
 

@@ -26,45 +26,53 @@ class RegisterUser implements ShouldQueue
     public function handle()
     {
         try {
-            \Log::info('Processing RegisterUser with data:', $this->data);
+            \Log::info('Processing RegisterUser:', $this->data);
 
+            if (empty($this->data['email']) || empty($this->data['password'])) {
+                return ['error' => 'Email and password are required.'];
+            }
+
+            // Check if email exists
+            if (User::where('email', $this->data['email'])->exists()) {
+                return ['error' => 'Email already exists.'];
+            }
+
+            // Create user
             $user = User::create([
-                'first_name' => $this->data['first_name'] ?? '',
-                'last_name' => $this->data['last_name'] ?? '',
-                'country' => $this->data['country'] ?? '',
-                'city' => $this->data['city'] ?? '',
-                'zip_code' => $this->data['zip_code'] ?? '',
-                'address' => $this->data['address'] ?? '',
-                'email' => $this->data['email'] ?? '',
-                'password' => Hash::make($this->data['password'] ?? ''),
-                'is_admin' => $this->data['is_admin'] ?? 0, // Optional admin flag
-                'payment_methods' => $this->data['payment_methods'] ?? '', // Optional payment methods
+                'first_name' => $this->data['first_name'],
+                'last_name' => $this->data['last_name'],
+                'country' => $this->data['country'],
+                'city' => $this->data['city'],
+                'zip_code' => $this->data['zip_code'],
+                'address' => $this->data['address'],
+                'email' => $this->data['email'],
+                'password' => Hash::make($this->data['password']),
+                'is_admin' => $this->data['is_admin'] ?? 0,
             ]);
 
+            \Log::info('User created successfully', ['user' => $user]);
 
-            \Log::info('User created successfully:', ['user' => $user->toArray()]);
-
+            // Generate JWT token
             $token = JWTAuth::claims([
+                'iss' => config('app.url') . '/api/register',
                 'role' => $user->is_admin ? 'admin' : 'user',
             ])->fromUser($user);
 
-            \Log::info('JWT token generated successfully.');
+            \Log::info('JWT token generated');
 
             return [
                 'token' => $token,
-                'user' => $user->toArray(),
+                'user' => $user,
             ];
         } catch (\Exception $e) {
-            \Log::error('Error in RegisterUser job:', [
+            \Log::error('Error in RegisterUser', [
                 'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
-            return [
-                'error' => 'Failed to register user',
-            ];
+            return ['error' => 'Registration failed.'];
         }
     }
+
 
 
     public function getResult()

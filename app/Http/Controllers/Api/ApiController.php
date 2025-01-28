@@ -29,7 +29,6 @@ class ApiController extends Controller
     public function register(Request $request)
     {
         return $this->safeCall(function () use ($request) {
-            // Step 1: Validate the Request
             $validator = Validator::make($request->all(), [
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'required|string|max:255',
@@ -41,46 +40,30 @@ class ApiController extends Controller
                 'password' => 'required|string|min:6|confirmed',
             ]);
 
-            // Step 2: Check Validation Errors
             if ($validator->fails()) {
-                \Log::error('Validation failed:', $validator->errors()->toArray());
                 return $this->errorResponse('Validation error', 400, $validator->errors());
             }
 
-            // Step 3: Prepare User Data
             $data = $request->only([
-                'first_name',
-                'last_name',
-                'country',
-                'city',
-                'zip_code',
-                'address',
-                'email',
+                'first_name', 'last_name', 'country', 'city', 'zip_code', 'address', 'email'
             ]);
-            $data['password'] = Hash::make($request->password);
+            $data['password'] = $request->password;
 
-            // Step 4: Create User
-            $user = User::create($data);
+            // Dispatch the job synchronously (blocking)
+            $job = new RegisterUser($data);
+            $result = $job->handle();
 
-            // Log User Creation
-            \Log::info('User created successfully:', ['user' => $user->toArray()]);
+            if (isset($result['error'])) {
+                return $this->errorResponse($result['error'], 400);
+            }
 
-            // Step 5: Generate JWT Token
-            $token = JWTAuth::fromUser($user);
-
-            // Log Token Generation
-            \Log::info('JWT token generated for user:', ['user_id' => $user->id]);
-
-            // Step 6: Return Success Response
             return $this->successResponse(
                 'User registered successfully.',
-                [
-                    'token' => $token,
-                    'user' => $user->toArray(),
-                ]
+                $result
             );
         });
     }
+
 
     // working 6.22
     public function createPaymentIntent(Request $request)
