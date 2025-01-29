@@ -30,9 +30,9 @@ class PaymentController extends Controller
                 ->get();
 
             // Check if no payments were found
-            if ($payments->isEmpty()) {
-                return $this->errorResponse('No payments found for the specified period.', 404);
-            }
+            // if ($payments->isEmpty()) {
+            //     return $this->errorResponse('No payments found for the specified period.', 404);
+            // }
 
             return $this->successResponse(
                 'Payments retrieved successfully.',
