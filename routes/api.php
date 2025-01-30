@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoteController;
 use App\Http\Controllers\Api\ApiController;
+use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SubscriptionController;
@@ -85,4 +86,14 @@ Route::group([
     Route::post('/products/{id}/vote', [ProductController::class, 'vote']);
 
     Route::post('/stripe/payment', [ApiController::class, 'stripePayment']);
+
+    Route::prefix('community')->controller(CommunityController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::post('/', 'store');
+        Route::get('/{id}', 'show');
+        Route::delete('/{id}', 'destroy');
+        Route::post('/{id}', 'update');
+        Route::post('/{id}/approve', 'is_approved');
+    });
+
 });

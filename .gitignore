@@ -21,3 +21,5 @@ yarn-error.log
 /.vscode
 /.zed
 log
+env
+laravel.log

@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\Community;
+use Tymon\JWTAuth\Contracts\JWTSubject;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Tymon\JWTAuth\Contracts\JWTSubject;
 
 
 class User extends Authenticatable implements JWTSubject
@@ -73,5 +74,10 @@ class User extends Authenticatable implements JWTSubject
     public function votes()
     {
         return $this->hasMany(Vote::class);
+    }
+
+    public function community()
+    {
+        return $this->hasMany(Community::class);
     }
 }
