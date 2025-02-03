@@ -26,6 +26,7 @@ class UserSeeder extends Seeder
             'last_name' => 'Doe',
             'email' => 'test@test.com',
             'password' => Hash::make('12345678'),
+            'subscription_id' => 1
         ]);
     }
 }
