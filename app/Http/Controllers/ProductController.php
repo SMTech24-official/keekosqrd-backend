@@ -117,7 +117,7 @@ class ProductController extends Controller
                 'description' => 'nullable|string',
                 'price' => 'nullable|numeric|min:0',
                 // 'product_image' => 'nullable|image|max:2048',
-                'product_image' => 'nullable|mimes:jpg,jpeg,png,gif,bmp,svg,webp|max:2048',
+                'product_image' => 'nullable|mimes:jpg,jpeg,png,gif,bmp,svg,webp|max:10240',
                 'status' => 'nullable|boolean',
             ]);
 
