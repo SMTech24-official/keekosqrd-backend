@@ -145,15 +145,18 @@ trait AdminAuthGetTrait
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
 
-            // Fetch the authenticated user
+            // Fetch the authenticated user along with their payments
             $authenticatedUser = Auth::user();
 
+            $user = User::with('payments')->find($authenticatedUser->id);
+
             return $this->successResponse(
-                'User retrieved successfully',
-                ['user' => $authenticatedUser]
+                'User and payments retrieved successfully',
+                ['user' => $user]  // Return the user with payments
             );
         });
     }
+
 
 
     public function update(Request $request, $id)
