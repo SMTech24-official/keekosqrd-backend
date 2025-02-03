@@ -69,11 +69,14 @@ class CommunityController extends Controller
             if ($validator->fails()) {
                 return $this->errorResponse('Validation failed', 422, $validator->errors());
             }
+            if (!Auth::check() || !Auth::user()->is_admin) {
+                return $this->errorResponse('Unauthorized. Only admins can view communities.', 403);
+            }
 
             // Handle File Upload Properly
             $productImagePath = null;
             if ($request->hasFile('product_image')) {
-                $productImagePath = $request->file('product_image')->store('product_images', 'public');
+                $productImagePath = $request->file('product_image')->store('community_images', 'public');
             }
 
             // Create the community record
@@ -109,42 +112,42 @@ class CommunityController extends Controller
     }
 
 
-    // public function update(Request $request, $id)
-    // {
-    //     return $this->safeCall(function () use ($request, $id) {
-    //         $community = Community::find($id);
-    //         if (!$community) {
-    //             return $this->errorResponse('Community not found.', 404);
-    //         }
+    public function update(Request $request, $id)
+    {
+        return $this->safeCall(function () use ($request, $id) {
+            $community = Community::find($id);
+            if (!$community) {
+                return $this->errorResponse('Community not found.', 404);
+            }
 
-    //         if (Auth::id() !== $community->user_id) {
-    //             return $this->errorResponse('Unauthorized.', 403);
-    //         }
+            if (!Auth::check() || !Auth::user()->is_admin) {
+                return $this->errorResponse('Unauthorized. Only admins can view communities.', 403);
+            }
 
-    //         $validator = Validator::make($request->all(), [
-    //             'product_name' => 'sometimes|string|max:255',
-    //             'product_image' => 'sometimes|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-    //             'brand' => 'sometimes|string|max:255',
-    //             'model' => 'sometimes|string|max:255',
-    //         ]);
+            $validator = Validator::make($request->all(), [
+                'product_name' => 'sometimes|string|max:255',
+                'product_image' => 'sometimes|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                'brand' => 'sometimes|string|max:255',
+                'model' => 'sometimes|string|max:255',
+            ]);
 
-    //         if ($validator->fails()) {
-    //             return $this->errorResponse('Validation failed', 422, $validator->errors());
-    //         }
+            if ($validator->fails()) {
+                return $this->errorResponse('Validation failed', 422, $validator->errors());
+            }
 
-    //         if ($request->hasFile('product_image')) {
-    //             $productImagePath = $request->file('product_image')->store('product_images', 'public');
+            if ($request->hasFile('product_image')) {
+                $productImagePath = $request->file('product_image')->store('community_images', 'public');
 
-    //             $community->product_image = $productImagePath;
-    //         }
+                $community->product_image = $productImagePath;
+            }
 
-    //         $community->update($request->only(['product_name', 'brand', 'model']));
+            $community->update($request->only(['product_name', 'brand', 'model']));
 
-    //         $community->product_image = $community->product_image ? asset('storage/' . $community->product_image) : null;
+            $community->product_image = $community->product_image ? asset('storage/' . $community->product_image) : null;
 
-    //         return $this->successResponse('Community updated successfully.', ['community' => $community]);
-    //     });
-    // }
+            return $this->successResponse('Community updated successfully.', ['community' => $community]);
+        });
+    }
 
 
 
