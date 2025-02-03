@@ -40,16 +40,7 @@ class CommunityController extends Controller
     public function index()
     {
         return $this->safeCall(function () {
-            $user = Auth::user();
-            if (!$user) {
-                return $this->errorResponse('You are not authorized to perform this action.', 403);
-            }
-
-            // Retrieve only approved communities
-            $communities = Community::with('user')
-                ->where('is_approved', '1') // Filter only approved communities
-                ->get();
-
+            $communities = Community::orderBy('created_at', 'desc')->limit(12)->get();
             return $this->successResponse('Communities retrieved successfully.', ['communities' => $communities]);
         });
     }
