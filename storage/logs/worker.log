@@ -1,0 +1,29 @@
+  2025-02-03 09:57:44 App\Jobs\ProductStoreJob ....................... RUNNING
+  2025-02-03 09:57:44 App\Jobs\ProductStoreJob .................. 36.51ms FAIL
+
+   UnexpectedValueException 
+
+  The stream or file "/var/www/keekosqrd-backend/storage/logs/laravel.log" could not be opened in append mode: Failed to open stream: Permission denied
+The exception occurred while attempting to log: The stream or file "/var/www/keekosqrd-backend/storage/logs/laravel.log" could not be opened in append mode: Failed to open stream: Permission denied
+The exception occurred while attempting to log: The stream or file "/var/www/keekosqrd-backend/storage/logs/laravel.log" could not be opened in append mode: Failed to open stream: Permission denied
+The exception occurred while attempting to log: Failed to store product
+Context: {"error":"The stream or file \"\/var\/www\/keekosqrd-backend\/storage\/logs\/laravel.log\" could not be opened in append mode: Failed to open stream: Permission denied\nThe exception occurred while attempting to log: Product stored successfully\nContext: {\"product_id\":2}","data":{"product_name":"Biscotti x Sherb Disposable Vape","brand_name":"Nike","model":"Air Max 270","size":"42\"","description":"Nike","price":"540","product_image":"product_images\/Nv5yUGsngstFnG4bGHFRWWM8yNcJzI75HTHntufw.jpg","status":false}}
+Context: {"exception":{}}
+Context: {"exception":{}}
+
+  at /var/www/keekosqrd-backend/vendor/monolog/monolog/src/Monolog/Handler/StreamHandler.php:156
+    152▕             }
+    153▕             if (!\is_resource($stream)) {
+    154▕                 $this->stream = null;
+    155▕ 
+  ➜ 156▕                 throw new \UnexpectedValueException(sprintf('The stream or file "%s" could not be opened in append mode: '.$this->errorMessage, $url) . Utils::getRecordMessageForException($record));
+    157▕             }
+    158▕             stream_set_chunk_size($stream, $this->streamChunkSize);
+    159▕             $this->stream = $stream;
+    160▕         }
+
+      [2m+12 vendor frames [22m
+
+  13  /var/www/keekosqrd-backend/artisan:13
+      Illuminate\Foundation\Application::handleCommand()
+
