@@ -261,6 +261,62 @@ class ProductController extends Controller
     //     });
     // }
 
+    // public function vote(Request $request, $productId)
+    // {
+    //     return $this->safeCall(function () use ($productId) {
+    //         if (!Auth::check()) {
+    //             return $this->errorResponse('You are not authorized to perform this action.', 403);
+    //         }
+
+    //         $userId = Auth::id();
+
+    //         // Check if the user has an active subscription
+    //         $subscription = Payment::where('user_id', $userId)
+    //             ->where('status', 'successful')
+    //             ->first();
+
+    //         if (!$subscription) {
+    //             return $this->errorResponse('You must be subscribed to vote.', 403);
+    //         }
+
+    //         $product = Product::find($productId);
+    //         Log::info("Product: " . $product);
+
+    //         if (!$product) {
+    //             return $this->errorResponse('Product not found.', 404);
+    //         }
+
+    //         if (!$product->status) {
+    //             return $this->errorResponse('Product is not active.', 403);
+    //         }
+
+    //         $userVotes = Vote::where('user_id', $userId)->count();
+
+    //         if ($userVotes >= 1) {
+    //             return $this->errorResponse('You have already voted for 1 product.', 403);
+    //         }
+
+    //         $vote = Vote::where('user_id', $userId)->where('product_id', $productId)->first();
+
+    //         if ($vote) {
+    //             return $this->errorResponse('You have already voted for this product.', 403);
+    //         }
+
+    //         Vote::create([
+    //             'user_id' => $userId,
+    //             'product_id' => $productId,
+    //             'votes' => 1,
+    //         ]);
+
+    //         $totalVotes = Vote::where('product_id', $productId)->sum('votes');
+
+    //         return $this->successResponse('Vote added successfully', [
+    //             'product' => $product,
+    //             'total_votes' => $totalVotes,
+    //         ]);
+    //     });
+    // }
+
     public function vote(Request $request, $productId)
     {
         return $this->safeCall(function () use ($productId) {
@@ -270,21 +326,29 @@ class ProductController extends Controller
 
             $userId = Auth::id();
 
+            // Debug: Log user attempting to vote
+            Log::info("User attempting to vote: user_id={$userId}, product_id={$productId}");
+
             // Check if the user has an active subscription
             $subscription = Payment::where('user_id', $userId)
                 ->where('status', 'successful')
                 ->first();
+
+            // Debug: Log subscription check
+            Log::info("Subscription check for user_id={$userId}: " . json_encode($subscription));
 
             if (!$subscription) {
                 return $this->errorResponse('You must be subscribed to vote.', 403);
             }
 
             $product = Product::find($productId);
-            Log::info("Product: " . $product);
 
             if (!$product) {
                 return $this->errorResponse('Product not found.', 404);
             }
+
+            // Debug: Log product details
+            Log::info("Product found: " . json_encode($product));
 
             if (!$product->status) {
                 return $this->errorResponse('Product is not active.', 403);
@@ -302,11 +366,17 @@ class ProductController extends Controller
                 return $this->errorResponse('You have already voted for this product.', 403);
             }
 
-            Vote::create([
+            // Log vote creation attempt
+            Log::info("Creating vote for user_id={$userId}, product_id={$productId}");
+
+            $newVote = Vote::create([
                 'user_id' => $userId,
                 'product_id' => $productId,
                 'votes' => 1,
             ]);
+
+            // Debug: Log the newly created vote
+            Log::info("Vote created: " . json_encode($newVote));
 
             $totalVotes = Vote::where('product_id', $productId)->sum('votes');
 
