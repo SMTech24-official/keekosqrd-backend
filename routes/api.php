@@ -25,7 +25,7 @@ Route::post('reset-password', [ApiController::class, 'resetPassword']);
 Route::get('/active-products', [ProductController::class, 'activeProducts'])->name('products.active');
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 
-
+Route::get('/community', [CommunityController::class, 'index'])->name('community.index');
 
 Route::group([
     "middleware" => ["auth:api"]
