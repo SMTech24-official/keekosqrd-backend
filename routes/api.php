@@ -25,7 +25,7 @@ Route::post('reset-password', [ApiController::class, 'resetPassword']);
 Route::get('/active-products', [ProductController::class, 'activeProducts'])->name('products.active');
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 
-Route::get('/community', [CommunityController::class, 'index'])->name('community.index');
+Route::get('/community', [CommunityController::class, 'index']);
 
 Route::group([
     "middleware" => ["auth:api"]
@@ -88,7 +88,7 @@ Route::group([
     Route::post('/stripe/payment', [ApiController::class, 'stripePayment']);
 
     Route::prefix('community')->controller(CommunityController::class)->group(function () {
-        Route::get('/', 'index');
+        // Route::get('/', 'index');
         Route::post('/', 'store');
         Route::get('/{id}', 'show');
         Route::delete('/{id}', 'destroy');
