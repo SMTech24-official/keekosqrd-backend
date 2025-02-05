@@ -51,7 +51,7 @@ class CommunityController extends Controller
         return $this->safeCall(function () use ($request) {
             $validator = Validator::make($request->all(), [
                 'product_name' => 'required|string|max:255',
-                'product_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:102400',
+                'product_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg',
                 'brand' => 'required|string|max:255',
                 'model' => 'required|string|max:255',
                 'description' => 'nullable|string',
