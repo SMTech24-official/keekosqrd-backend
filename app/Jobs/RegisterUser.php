@@ -3,10 +3,10 @@
 namespace App\Jobs;
 
 use App\Models\User;
-use App\Models\Payment;
 use Illuminate\Bus\Queueable;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,33 +37,35 @@ class RegisterUser implements ShouldQueue
                 return ['error' => 'Email already exists.'];
             }
 
-            // Create user
-            $user = User::create([
-                'first_name' => $this->data['first_name'],
-                'last_name' => $this->data['last_name'],
-                'country' => $this->data['country'],
-                'city' => $this->data['city'],
-                'zip_code' => $this->data['zip_code'],
-                'address' => $this->data['address'],
-                'email' => $this->data['email'],
-                'password' => Hash::make($this->data['password']),
-                'is_admin' => $this->data['is_admin'] ?? 0,
-            ]);
+            return DB::transaction(function () {
+                // Create user inside transaction
+                $user = User::create([
+                    'first_name' => $this->data['first_name'],
+                    'last_name' => $this->data['last_name'],
+                    'country' => $this->data['country'],
+                    'city' => $this->data['city'],
+                    'zip_code' => $this->data['zip_code'],
+                    'address' => $this->data['address'],
+                    'email' => $this->data['email'],
+                    'password' => Hash::make($this->data['password']),
+                    'is_admin' => $this->data['is_admin'] ?? 0,
+                ]);
 
-            \Log::info('User created successfully', ['user' => $user]);
+                \Log::info('User created successfully', ['user' => $user]);
 
-            // Generate JWT token
-            $token = JWTAuth::claims([
-                'iss' => config('app.url') . '/api/register',
-                'role' => $user->is_admin ? 'admin' : 'user',
-            ])->fromUser($user);
+                // Generate JWT token
+                $token = JWTAuth::claims([
+                    'iss' => config('app.url') . '/api/register',
+                    'role' => $user->is_admin ? 'admin' : 'user',
+                ])->fromUser($user);
 
-            \Log::info('JWT token generated');
+                \Log::info('JWT token generated');
 
-            return [
-                'token' => $token,
-                'user' => $user,
-            ];
+                return [
+                    'token' => $token,
+                    'user' => $user,
+                ];
+            });
         } catch (\Exception $e) {
             \Log::error('Error in RegisterUser', [
                 'message' => $e->getMessage(),
@@ -72,8 +74,6 @@ class RegisterUser implements ShouldQueue
             return ['error' => 'Registration failed.'];
         }
     }
-
-
 
     public function getResult()
     {
