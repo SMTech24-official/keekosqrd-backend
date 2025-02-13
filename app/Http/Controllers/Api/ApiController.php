@@ -76,8 +76,8 @@ class ApiController extends Controller
         try {
             $user = auth()->user();
 
-            // Ensure the user has a Stripe customer ID
-            if (!$user->stripe_customer_id) {
+            // ✅ Check if the user already has a valid Stripe customer ID
+            if (!$user->stripe_customer_id || !$this->isValidStripeCustomer($user->stripe_customer_id)) {
                 $customer = \Stripe\Customer::create([
                     'email' => $user->email,
                     'name' => "{$user->first_name} {$user->last_name}",
@@ -104,31 +104,18 @@ class ApiController extends Controller
             $paymentMethod->attach(['customer' => $user->stripe_customer_id]);
 
             // Retrieve price from Stripe
-            $price = \Stripe\Price::retrieve('price_1QhpRzDgYV6zJ17vbxoBnokH'); // Replace with your Price ID
+            $price = \Stripe\Price::retrieve('price_1QhpRzDgYV6zJ17vbxoBnokH');
 
-            // ✅ Create a PaymentIntent with immediate confirmation
+            // ✅ Create a PaymentIntent
             $paymentIntent = \Stripe\PaymentIntent::create([
                 'amount' => $price->unit_amount,
                 'currency' => $price->currency,
                 'payment_method' => $request->payment_method,
                 'customer' => $user->stripe_customer_id,
                 'payment_method_types' => ['card'],
-                'setup_future_usage' => 'off_session', // Saves for future payments
-                'confirm' => true, // Confirm payment immediately
-                'return_url' => route('payment.success') // Ensure this is a valid return URL
+                'setup_future_usage' => 'off_session',
+                'confirm' => true,
             ]);
-
-            // ✅ Check if Payment Requires Authentication
-            if ($paymentIntent->status === 'requires_action') {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Payment requires additional authentication.',
-                    'data' => [
-                        'requires_action' => true,
-                        'client_secret' => $paymentIntent->client_secret,
-                    ],
-                ], 402);
-            }
 
             // Save payment details
             Payment::create([
@@ -158,6 +145,16 @@ class ApiController extends Controller
                 'message' => 'Failed to create PaymentIntent.',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    private function isValidStripeCustomer($customerId)
+    {
+        try {
+            $customer = \Stripe\Customer::retrieve($customerId);
+            return isset($customer->id) && $customer->id === $customerId;
+        } catch (\Exception $e) {
+            return false; // Invalid customer ID
         }
     }
 
@@ -362,23 +359,24 @@ class ApiController extends Controller
             $user = Auth::user();
             $payment = Payment::where('user_id', $user->id)->latest()->first();
 
-            if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id) {
+            // ✅ Ensure the customer ID is valid
+            if (!$user->stripe_customer_id || !$this->isValidStripeCustomer($user->stripe_customer_id)) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'No valid payment method or customer ID found for the user.',
-                ], 404);
+                    'message' => 'Invalid Stripe customer ID. Please create a new payment intent.',
+                ], 400);
             }
 
-            // ✅ Create Subscription with Auto-Charge
+            // ✅ Create Subscription
             $subscription = \Stripe\Subscription::create([
-                'customer' => $payment->stripe_customer_id,
+                'customer' => $user->stripe_customer_id,
                 'items' => [
                     [
                         'price' => $request->price_id,
                     ],
                 ],
-                'default_payment_method' => $payment->payment_method, // Uses saved method
-                'payment_behavior' => 'default_incomplete', // Prevents immediate failure
+                'default_payment_method' => $payment->payment_method,
+                'payment_behavior' => 'default_incomplete',
                 'expand' => ['latest_invoice.payment_intent'],
             ]);
 
@@ -424,6 +422,7 @@ class ApiController extends Controller
             ], 500);
         }
     }
+
 
 
 

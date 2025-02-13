@@ -1,1 +1,6 @@
 
+# Ignore environment file
+.env
+
+# Ignore Laravel log file
+storage/logs/laravel.log
