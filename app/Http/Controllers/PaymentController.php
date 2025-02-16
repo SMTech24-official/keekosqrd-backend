@@ -25,9 +25,15 @@ class PaymentController extends Controller
             }
 
             // Fetch all payments for the given month and year
-            $payments = Payment::whereMonth('created_at', $month)
+            // $payments = Payment::whereMonth('created_at', $month)
+            //     ->whereYear('created_at', $year)
+            //     ->get();
+
+            $payments = Payment::with('user')
+                ->whereMonth('created_at', $month)
                 ->whereYear('created_at', $year)
                 ->get();
+
 
             // Check if no payments were found
             // if ($payments->isEmpty()) {

@@ -13,6 +13,7 @@ use Stripe\PaymentMethod;
 use App\Jobs\RegisterUser;
 use Illuminate\Http\Request;
 use App\Traits\HandlesApiResponse;
+use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -72,215 +73,12 @@ class ApiController extends Controller
     }
     // public function createPaymentIntent(Request $request)
     // {
-    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret')); // Use test key for testing
 
     //     try {
     //         $user = auth()->user();
 
-    //         // ✅ Check if the user already has a valid Stripe customer ID
-    //         if (!$user->stripe_customer_id || !$this->isValidStripeCustomer($user->stripe_customer_id)) {
-    //             $customer = \Stripe\Customer::create([
-    //                 'email' => $user->email,
-    //                 'name' => "{$user->first_name} {$user->last_name}",
-    //             ]);
-    //             $user->stripe_customer_id = $customer->id;
-    //             $user->save();
-    //         }
-
-    //         // Validate the request
-    //         $validator = Validator::make($request->all(), [
-    //             'payment_method' => 'required|string',
-    //         ]);
-
-    //         if ($validator->fails()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Validation error',
-    //                 'errors' => $validator->errors(),
-    //             ], 400);
-    //         }
-
-    //         // Attach payment method to customer
-    //         $paymentMethod = \Stripe\PaymentMethod::retrieve($request->payment_method);
-    //         $paymentMethod->attach(['customer' => $user->stripe_customer_id]);
-
-    //         // Retrieve price from Stripe
-    //         $price = \Stripe\Price::retrieve('price_1QhpRzDgYV6zJ17vbxoBnokH');
-
-    //         // ✅ Create a PaymentIntent
-    //         $paymentIntent = \Stripe\PaymentIntent::create([
-    //             'amount' => $price->unit_amount,
-    //             'currency' => $price->currency,
-    //             'payment_method' => $request->payment_method,
-    //             'customer' => $user->stripe_customer_id,
-    //             'payment_method_types' => ['card'],
-    //             'setup_future_usage' => 'off_session',
-    //             'confirm' => true,
-    //         ]);
-
-    //         // Save payment details
-    //         Payment::create([
-    //             'user_id' => $user->id,
-    //             'payment_intent_id' => $paymentIntent->id,
-    //             'payment_method' => $request->payment_method,
-    //             'stripe_customer_id' => $user->stripe_customer_id,
-    //             'amount' => $price->unit_amount / 100,
-    //             'status' => $paymentIntent->status,
-    //         ]);
-
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'PaymentIntent created and confirmed successfully.',
-    //             'data' => [
-    //                 'client_secret' => $paymentIntent->client_secret,
-    //                 'payment_intent_id' => $paymentIntent->id,
-    //                 'amount' => $price->unit_amount / 100,
-    //                 'currency' => $price->currency,
-    //                 'payment_status' => $paymentIntent->status,
-    //             ],
-    //         ]);
-    //     } catch (\Stripe\Exception\ApiErrorException $e) {
-    //         \Log::error('Failed to create PaymentIntent: ' . $e->getMessage());
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Failed to create PaymentIntent.',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
-    // private function isValidStripeCustomer($customerId)
-    // {
-    //     try {
-    //         $customer = \Stripe\Customer::retrieve($customerId);
-    //         return isset($customer->id) && $customer->id === $customerId;
-    //     } catch (\Exception $e) {
-    //         return false; // Invalid customer ID
-    //     }
-    // }
-    public function createPaymentIntent(Request $request)
-    {
-        \Stripe\Stripe::setApiKey(config('services.stripe.secret')); // Use test key for testing
-
-        try {
-            $user = auth()->user();
-
-            // ✅ **Ensure the user has a Stripe customer ID**
-            if (!$user->stripe_customer_id) {
-                $customer = \Stripe\Customer::create([
-                    'email' => $user->email,
-                    'name' => "{$user->first_name} {$user->last_name}",
-                ]);
-                $user->stripe_customer_id = $customer->id;
-                $user->save();
-            } else {
-                // ✅ **Check if Customer Exists in Stripe**
-                try {
-                    \Stripe\Customer::retrieve($user->stripe_customer_id);
-                } catch (\Stripe\Exception\InvalidRequestException $e) {
-                    // If customer is not found, recreate them
-                    $customer = \Stripe\Customer::create([
-                        'email' => $user->email,
-                        'name' => "{$user->first_name} {$user->last_name}",
-                    ]);
-                    $user->stripe_customer_id = $customer->id;
-                    $user->save();
-                }
-            }
-
-            // ✅ **Validate request**
-            $validator = Validator::make($request->all(), [
-                'payment_method' => 'required|string',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors(),
-                ], 400);
-            }
-
-            // ✅ **Retrieve and attach PaymentMethod**
-            try {
-                $paymentMethod = \Stripe\PaymentMethod::retrieve($request->payment_method);
-                $paymentMethod->attach(['customer' => $user->stripe_customer_id]);
-            } catch (\Stripe\Exception\InvalidRequestException $e) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Invalid PaymentMethod ID. Please try again.',
-                    'error' => $e->getMessage(),
-                ], 400);
-            }
-
-            // ✅ **Set default PaymentMethod for future billing**
-            \Stripe\Customer::update($user->stripe_customer_id, [
-                'invoice_settings' => ['default_payment_method' => $request->payment_method],
-            ]);
-
-            // ✅ **Create a PaymentIntent**
-            $paymentIntent = \Stripe\PaymentIntent::create([
-                'amount' => 1000, // 10 GBP (amount in pence)
-                'currency' => 'gbp',
-                'payment_method' => $request->payment_method,
-                'customer' => $user->stripe_customer_id,
-                'confirmation_method' => 'manual',
-                'confirm' => true,
-                'return_url' => 'https://yourwebsite.com/payment-success',
-            ]);
-
-            // ✅ **Store Payment in Database**
-            $payment = Payment::create([
-                'user_id' => $user->id,
-                'payment_intent_id' => $paymentIntent->id,
-                'payment_method' => $request->payment_method,
-                'stripe_customer_id' => $user->stripe_customer_id,
-                'amount' => 10.00, // Convert from pence
-                'status' => $paymentIntent->status,
-            ]);
-
-            // ✅ **Handle SCA (requires_action)**
-            if ($paymentIntent->status === 'requires_action') {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Payment requires authentication.',
-                    'data' => [
-                        'requires_action' => true,
-                        'client_secret' => $paymentIntent->client_secret,
-                        'payment_intent_id' => $paymentIntent->id,
-                    ],
-                ], 402);
-            }
-
-            // ✅ **If payment is successful**
-            return response()->json([
-                'status' => true,
-                'message' => 'Payment processed successfully.',
-                'data' => [
-                    'payment_intent_id' => $paymentIntent->id,
-                    'status' => $paymentIntent->status,
-                ],
-            ]);
-        } catch (\Stripe\Exception\ApiErrorException $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Failed to create PaymentIntent.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-
-
-    // working 10.49 am 2/16/25
-    // public function createPaymentIntent(Request $request)
-    // {
-    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
-    //     try {
-    //         $user = auth()->user();
-
-    //         // Ensure the user has a Stripe customer ID
+    //         // ✅ **Ensure the user has a Stripe customer ID**
     //         if (!$user->stripe_customer_id) {
     //             $customer = \Stripe\Customer::create([
     //                 'email' => $user->email,
@@ -288,9 +86,22 @@ class ApiController extends Controller
     //             ]);
     //             $user->stripe_customer_id = $customer->id;
     //             $user->save();
+    //         } else {
+    //             // ✅ **Check if Customer Exists in Stripe**
+    //             try {
+    //                 \Stripe\Customer::retrieve($user->stripe_customer_id);
+    //             } catch (\Stripe\Exception\InvalidRequestException $e) {
+    //                 // If customer is not found, recreate them
+    //                 $customer = \Stripe\Customer::create([
+    //                     'email' => $user->email,
+    //                     'name' => "{$user->first_name} {$user->last_name}",
+    //                 ]);
+    //                 $user->stripe_customer_id = $customer->id;
+    //                 $user->save();
+    //             }
     //         }
 
-    //         // Validate request
+    //         // ✅ **Validate request**
     //         $validator = Validator::make($request->all(), [
     //             'payment_method' => 'required|string',
     //         ]);
@@ -303,7 +114,7 @@ class ApiController extends Controller
     //             ], 400);
     //         }
 
-    //         // Retrieve and attach PaymentMethod
+    //         // ✅ **Retrieve and attach PaymentMethod**
     //         try {
     //             $paymentMethod = \Stripe\PaymentMethod::retrieve($request->payment_method);
     //             $paymentMethod->attach(['customer' => $user->stripe_customer_id]);
@@ -315,14 +126,14 @@ class ApiController extends Controller
     //             ], 400);
     //         }
 
-    //         // Set default PaymentMethod
+    //         // ✅ **Set default PaymentMethod for future billing**
     //         \Stripe\Customer::update($user->stripe_customer_id, [
     //             'invoice_settings' => ['default_payment_method' => $request->payment_method],
     //         ]);
 
-    //         // Create PaymentIntent with SCA support
+    //         // ✅ **Create a PaymentIntent**
     //         $paymentIntent = \Stripe\PaymentIntent::create([
-    //             'amount' => 1000, // Amount in pence (e.g., £10.00)
+    //             'amount' => 1000, // 10 GBP (amount in pence)
     //             'currency' => 'gbp',
     //             'payment_method' => $request->payment_method,
     //             'customer' => $user->stripe_customer_id,
@@ -331,7 +142,7 @@ class ApiController extends Controller
     //             'return_url' => 'https://yourwebsite.com/payment-success',
     //         ]);
 
-    //         // ✅ **Store PaymentIntent in Database (Even if requires_action)**
+    //         // ✅ **Store Payment in Database**
     //         $payment = Payment::create([
     //             'user_id' => $user->id,
     //             'payment_intent_id' => $paymentIntent->id,
@@ -341,7 +152,7 @@ class ApiController extends Controller
     //             'status' => $paymentIntent->status,
     //         ]);
 
-    //         // ✅ **If authentication is required, return client_secret**
+    //         // ✅ **Handle SCA (requires_action)**
     //         if ($paymentIntent->status === 'requires_action') {
     //             return response()->json([
     //                 'status' => false,
@@ -349,7 +160,7 @@ class ApiController extends Controller
     //                 'data' => [
     //                     'requires_action' => true,
     //                     'client_secret' => $paymentIntent->client_secret,
-    //                     'payment_intent_id' => $paymentIntent->id, // Return PaymentIntent ID for tracking
+    //                     'payment_intent_id' => $paymentIntent->id,
     //                 ],
     //             ], 402);
     //         }
@@ -371,405 +182,101 @@ class ApiController extends Controller
     //         ], 500);
     //     }
     // }
+    public function createPaymentIntent(Request $request)
+    {
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
+        try {
+            $user = auth()->user();
 
+            if (!$user->stripe_customer_id) {
+                $customer = \Stripe\Customer::create([
+                    'email' => $user->email,
+                    'name' => "{$user->first_name} {$user->last_name}",
+                ]);
+                $user->stripe_customer_id = $customer->id;
+                $user->save();
+            }
 
+            $validator = Validator::make($request->all(), [
+                'payment_method' => 'required|string',
+                'price_id' => 'required|string',
+            ]);
 
-    // working 6.22
-    // public function createPaymentIntent(Request $request)
-    // {
-    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ], 400);
+            }
 
-    //     try {
-    //         $user = auth()->user();
+            $paymentMethod = \Stripe\PaymentMethod::retrieve($request->payment_method);
+            $paymentMethod->attach(['customer' => $user->stripe_customer_id]);
 
-    //         // Ensure the user has a Stripe customer ID
-    //         if (!$user->stripe_customer_id) {
-    //             $customer = \Stripe\Customer::create([
-    //                 'email' => $user->email,
-    //                 'name' => "{$user->first_name} {$user->last_name}",
-    //             ]);
-    //             $user->stripe_customer_id = $customer->id;
-    //             $user->save();
-    //         }
+            \Stripe\Customer::update($user->stripe_customer_id, [
+                'invoice_settings' => ['default_payment_method' => $request->payment_method],
+            ]);
 
-    //         // Validate the request
-    //         $validator = Validator::make($request->all(), [
-    //             'payment_method' => 'required|string',
-    //         ]);
+            $paymentIntent = \Stripe\PaymentIntent::create([
+                'amount' => 1000,
+                'currency' => 'gbp',
+                'payment_method' => $request->payment_method,
+                'customer' => $user->stripe_customer_id,
+                'confirmation_method' => 'manual',
+                'confirm' => true,
+                'return_url' => 'https://yourwebsite.com/payment-success',
+            ]);
 
-    //         if ($validator->fails()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Validation error',
-    //                 'errors' => $validator->errors(),
-    //             ], 400);
-    //         }
-    //         // Must add this code in live key
-    //         $paymentMethod = \Stripe\PaymentMethod::retrieve($request->payment_method);
-    //         $paymentMethod->attach(['customer' => $user->stripe_customer_id]);
+            $subscription = \Stripe\Subscription::create([
+                'customer' => $user->stripe_customer_id,
+                'items' => [['price' => $request->price_id]],
+                'default_payment_method' => $request->payment_method,
+                'expand' => ['latest_invoice.payment_intent'],
+                'payment_behavior' => 'default_incomplete',
+            ]);
 
-    //         // Create a PaymentIntent
-    //         $price = \Stripe\Price::retrieve('price_1QhpRzDgYV6zJ17vbxoBnokH'); // Replace with your Price ID
+            $payment = Payment::create([
+                'user_id' => $user->id,
+                'payment_intent_id' => $paymentIntent->id,
+                'payment_method' => $request->payment_method,
+                'stripe_customer_id' => $user->stripe_customer_id,
+                'amount' => 10.00,
+                'status' => $paymentIntent->status,
+                'subscription_id' => $subscription->id,
+            ]);
 
-    //         $paymentIntent = \Stripe\PaymentIntent::create([
-    //             'amount' => $price->unit_amount,
-    //             'currency' => $price->currency,
-    //             'payment_method' => $request->payment_method,
-    //             'customer' => $user->stripe_customer_id,
-    //             'payment_method_types' => ['card'],
-    //             'setup_future_usage' => 'off_session', // Save for future payments
-    //         ]);
+            if ($paymentIntent->status === 'requires_action') {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Payment requires authentication.',
+                    'data' => [
+                        'requires_action' => true,
+                        'client_secret' => $paymentIntent->client_secret,
+                        'payment_intent_id' => $paymentIntent->id,
+                        'subscription_id' => $subscription->id,
+                    ],
+                ], 402);
+            }
 
-    //         // Save the payment details to the database
-    //         Payment::create([
-    //             'user_id' => $user->id,
-    //             'payment_intent_id' => $paymentIntent->id,
-    //             'payment_method' => $request->payment_method,
-    //             'stripe_customer_id' => $user->stripe_customer_id,
-    //             'amount' => $price->unit_amount / 100,
-    //             'status' => $paymentIntent->status,
-    //         ]);
+            return response()->json([
+                'status' => true,
+                'message' => 'Payment processed successfully.',
+                'data' => [
+                    'payment_intent_id' => $paymentIntent->id,
+                    'status' => $paymentIntent->status,
+                    'subscription_id' => $subscription->id,
+                ],
+            ]);
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to create PaymentIntent.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'PaymentIntent created successfully.',
-    //             'data' => [
-    //                 'client_secret' => $paymentIntent->client_secret,
-    //                 'payment_intent_id' => $paymentIntent->id,
-    //                 'amount' => $price->unit_amount / 100,
-    //                 'currency' => $price->currency,
-    //             ],
-    //         ]);
-    //     } catch (\Stripe\Exception\ApiErrorException $e) {
-    //         \Log::error('Failed to create PaymentIntent: ' . $e->getMessage());
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Failed to create PaymentIntent.',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
-
-
-
-    // Working 2/13/2025
-    // public function subscribe(Request $request)
-    // {
-    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
-    //     try {
-    //         // Validate the request
-    //         $validator = Validator::make($request->all(), [
-    //             'price_id' => 'required|string', // Price ID is required
-    //         ]);
-
-    //         if ($validator->fails()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Validation error',
-    //                 'errors' => $validator->errors(),
-    //             ], 400);
-    //         }
-
-    //         // Fetch the authenticated user
-    //         $user = Auth::user();
-
-    //         // Retrieve the latest payment record for the user
-    //         $payment = Payment::where('user_id', $user->id)->latest()->first();
-
-    //         if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'No valid payment method, customer ID, or payment intent found for the user.',
-    //             ], 404);
-    //         }
-
-    //         // Retrieve and confirm the payment intent from Stripe
-    //         $paymentIntent = \Stripe\PaymentIntent::retrieve($payment->payment_intent_id);
-
-    //         if ($paymentIntent->status === 'requires_confirmation') {
-    //             $paymentIntent = $paymentIntent->confirm();
-
-    //             if ($paymentIntent->status !== 'succeeded') {
-    //                 return response()->json([
-    //                     'status' => false,
-    //                     'message' => 'Payment could not be completed.',
-    //                     'data' => [
-    //                         'payment_intent_status' => $paymentIntent->status,
-    //                     ],
-    //                 ], 402);
-    //             }
-    //         }
-
-    //         // Attach the payment method to the customer
-    //         $paymentMethod = \Stripe\PaymentMethod::retrieve($payment->payment_method);
-    //         $paymentMethod->attach(['customer' => $payment->stripe_customer_id]);
-
-    //         // Set the payment method as the default for the customer
-    //         \Stripe\Customer::update($payment->stripe_customer_id, [
-    //             'invoice_settings' => [
-    //                 'default_payment_method' => $payment->payment_method,
-    //             ],
-    //         ]);
-
-    //         // Create a subscription
-    //         $subscription = \Stripe\Subscription::create([
-    //             'customer' => $payment->stripe_customer_id,
-    //             'items' => [
-    //                 [
-    //                     'price' => $request->price_id,
-    //                 ],
-    //             ],
-    //         ]);
-
-    //         // Save subscription details to the database
-    //         $payment->update([
-    //             'subscription_id' => $subscription->id,
-    //             'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
-    //         ]);
-
-    //         $user->update([
-    //             'subscription_id' => $subscription->id,
-    //         ]);
-
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Subscription created and payment confirmed successfully.',
-    //             'data' => [
-    //                 'subscription_id' => $subscription->id,
-    //                 'status' => $subscription->status,
-    //             ],
-    //         ]);
-    //     } catch (\Stripe\Exception\ApiErrorException $e) {
-    //         \Log::error('Failed to create subscription: ' . $e->getMessage());
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Failed to create subscription.',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
-    // public function subscribe(Request $request)
-    // {
-    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
-    //     try {
-    //         $validator = Validator::make($request->all(), [
-    //             'price_id' => 'required|string',
-    //         ]);
-
-    //         if ($validator->fails()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Validation error',
-    //                 'errors' => $validator->errors(),
-    //             ], 400);
-    //         }
-
-    //         $user = Auth::user();
-    //         $payment = Payment::where('user_id', $user->id)->latest()->first();
-
-    //         if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'No valid payment method, customer ID, or payment intent found for the user.',
-    //             ], 404);
-    //         }
-
-    //         $paymentIntent = \Stripe\PaymentIntent::retrieve($payment->payment_intent_id);
-
-    //         if ($paymentIntent->status === 'requires_confirmation') {
-    //             $paymentIntent = $paymentIntent->confirm();
-    //         }
-
-    //         // ✅ Handle "requires_action" properly
-    //         if ($paymentIntent->status === 'requires_action') {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Payment requires additional authentication.',
-    //                 'data' => [
-    //                     'requires_action' => true,
-    //                     'client_secret' => $paymentIntent->client_secret,
-    //                 ],
-    //             ], 402);
-    //         }
-
-    //         if ($paymentIntent->status !== 'succeeded') {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Payment could not be completed.',
-    //                 'data' => [
-    //                     'payment_intent_status' => $paymentIntent->status,
-    //                 ],
-    //             ], 402);
-    //         }
-
-    //         $paymentMethod = \Stripe\PaymentMethod::retrieve($payment->payment_method);
-    //         $paymentMethod->attach(['customer' => $payment->stripe_customer_id]);
-
-    //         \Stripe\Customer::update($payment->stripe_customer_id, [
-    //             'invoice_settings' => [
-    //                 'default_payment_method' => $payment->payment_method,
-    //             ],
-    //         ]);
-
-    //         $subscription = \Stripe\Subscription::create([
-    //             'customer' => $payment->stripe_customer_id,
-    //             'items' => [
-    //                 [
-    //                     'price' => $request->price_id,
-    //                 ],
-    //             ],
-    //         ]);
-
-    //         $payment->update([
-    //             'subscription_id' => $subscription->id,
-    //             'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
-    //         ]);
-
-    //         $user->update([
-    //             'subscription_id' => $subscription->id,
-    //         ]);
-
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Subscription created and payment confirmed successfully.',
-    //             'data' => [
-    //                 'subscription_id' => $subscription->id,
-    //                 'status' => $subscription->status,
-    //             ],
-    //         ]);
-    //     } catch (\Stripe\Exception\ApiErrorException $e) {
-    //         \Log::error('Failed to create subscription: ' . $e->getMessage());
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Failed to create subscription.',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-    // working 11.04 am 2025/02/16
-    // public function subscribe(Request $request)
-    // {
-    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
-    //     try {
-    //         $validator = Validator::make($request->all(), [
-    //             'price_id' => 'required|string',
-    //         ]);
-
-    //         if ($validator->fails()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Validation error',
-    //                 'errors' => $validator->errors(),
-    //             ], 400);
-    //         }
-
-    //         $user = Auth::user();
-    //         $payment = Payment::where('user_id', $user->id)->latest()->first();
-
-    //         if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'No valid payment method, customer ID, or payment intent found for the user.',
-    //             ], 404);
-    //         }
-
-    //         // Attach payment method and set as default for the customer
-    //         $paymentMethod = \Stripe\PaymentMethod::retrieve($payment->payment_method);
-    //         $paymentMethod->attach(['customer' => $payment->stripe_customer_id]);
-
-    //         \Stripe\Customer::update($payment->stripe_customer_id, [
-    //             'invoice_settings' => [
-    //                 'default_payment_method' => $payment->payment_method,
-    //             ],
-    //         ]);
-
-    //         // ✅ **Create Subscription and Expand Latest Invoice**
-    //         $subscription = \Stripe\Subscription::create([
-    //             'customer' => $payment->stripe_customer_id,
-    //             'items' => [
-    //                 [
-    //                     'price' => $request->price_id,
-    //                 ],
-    //             ],
-    //             'default_payment_method' => $payment->payment_method,
-    //             'expand' => ['latest_invoice.payment_intent'],
-    //             'payment_behavior' => 'default_incomplete', // Ensures first payment intent is created
-    //         ]);
-
-    //         $latestInvoice = $subscription->latest_invoice;
-    //         $invoicePaymentIntent = $latestInvoice->payment_intent;
-
-    //         // ✅ **Confirm PaymentIntent if `requires_confirmation`**
-    //         if ($invoicePaymentIntent && $invoicePaymentIntent->status === 'requires_confirmation') {
-    //             $invoicePaymentIntent = $invoicePaymentIntent->confirm();
-    //         }
-
-    //         // ✅ **Handle 3D Secure (requires_action)**
-    //         if ($invoicePaymentIntent && $invoicePaymentIntent->status === 'requires_action') {
-    //             // ✅ **Save the subscription in the database even if authentication is required**
-    //             $payment->update([
-    //                 'subscription_id' => $subscription->id,
-    //                 'status' => 'pending_authentication', // Mark as pending if requires_action
-    //             ]);
-
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Subscription payment requires authentication.',
-    //                 'data' => [
-    //                     'requires_action' => true,
-    //                     'client_secret' => $invoicePaymentIntent->client_secret,
-    //                     'subscription_id' => $subscription->id,
-    //                 ],
-    //             ], 402);
-    //         }
-
-    //         // ✅ **If payment fails, return an error**
-    //         if ($invoicePaymentIntent && $invoicePaymentIntent->status !== 'succeeded') {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Subscription payment failed.',
-    //                 'data' => [
-    //                     'subscription_id' => $subscription->id,
-    //                     'payment_intent_status' => $invoicePaymentIntent->status,
-    //                 ],
-    //             ], 402);
-    //         }
-
-    //         // ✅ **Save Subscription in the Database**
-    //         $payment->update([
-    //             'subscription_id' => $subscription->id,
-    //             'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
-    //         ]);
-
-    //         $user->update([
-    //             'subscription_id' => $subscription->id,
-    //         ]);
-
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Subscription activated successfully.',
-    //             'data' => [
-    //                 'subscription_id' => $subscription->id,
-    //                 'status' => $subscription->status,
-    //             ],
-    //         ]);
-    //     } catch (\Stripe\Exception\ApiErrorException $e) {
-    //         \Log::error('Failed to create subscription: ' . $e->getMessage());
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Failed to create subscription.',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
-    // working 11.04 am 2025/02/16
     public function subscribe(Request $request)
     {
         \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
@@ -792,12 +299,9 @@ class ApiController extends Controller
             }
 
             $priceId = trim(filter_var($request->price_id, FILTER_SANITIZE_STRING));
-            \Log::info('Received valid price_id.', ['price_id' => $priceId]);
 
             // ✅ **Fetch User and Payment Details**
             $user = Auth::user();
-            \Log::info('Fetching latest payment details.', ['user_id' => $user->id]);
-
             $payment = Payment::where('user_id', $user->id)
                 ->whereNotNull('payment_intent_id')
                 ->latest()
@@ -814,6 +318,10 @@ class ApiController extends Controller
             $paymentIntentId = $payment->payment_intent_id;
             \Log::info('Retrieved payment intent.', ['payment_intent_id' => $paymentIntentId]);
 
+            // ✅ **Set return URL before use**
+            $returnUrl = url('/api/payment-confirmation?payment_intent=' . $paymentIntentId);
+            // $returnUrl = url('https://www.ksquaredsourcedcity.com');
+
             // ✅ **Confirm the PaymentIntent (if required)**
             try {
                 \Log::info('Fetching PaymentIntent from Stripe.', ['payment_intent_id' => $paymentIntentId]);
@@ -821,63 +329,23 @@ class ApiController extends Controller
 
                 if (in_array($paymentIntent->status, ['requires_action', 'requires_confirmation'])) {
                     \Log::info('PaymentIntent requires confirmation, attempting to confirm.', ['status' => $paymentIntent->status]);
+                    $paymentIntent = $paymentIntent->confirm(['return_url' => $returnUrl]);
 
-                    // **FIX: Provide return_url explicitly for SCA authentication**
-                    // $paymentIntent = $paymentIntent->confirm([
-                    //     'return_url' => 'https://yourwebsite.com/payment-confirmation'
-                    // ]);
-                    $paymentIntent = $paymentIntent->confirm([
-                        'return_url' => url('/api/payment-confirmation') // ✅ Set a proper return URL
-                    ]);
-                }
-
-                // if ($paymentIntent->status === 'requires_action') {
-
-                //     return response()->json([
-                //         'status' => false,
-                //         'message' => 'Payment requires authentication.',
-                //         'data' => [
-                //             'requires_action' => true,
-                //             'client_secret' => $paymentIntent->client_secret,  // Send this to the frontend
-                //             'payment_intent_id' => $paymentIntentId,
-                //         ],
-                //     ], 402);
-                // }
-                if ($paymentIntent->status === 'requires_action') {
-                    \Log::warning('Payment requires authentication.', ['payment_intent_id' => $paymentIntentId]);
-
-                    // ✅ **Check if Stripe provides a redirect URL for authentication**
-                    if (isset($paymentIntent->next_action) && $paymentIntent->next_action->type === 'redirect_to_url') {
-                        $redirectUrl = $paymentIntent->next_action->redirect_to_url->url;
-
-                        \Log::info('Redirecting user for authentication.', ['redirect_url' => $redirectUrl]);
-
+                    if ($paymentIntent->status === 'requires_action' && isset($paymentIntent->next_action->redirect_to_url)) {
                         return response()->json([
                             'status' => false,
                             'message' => 'Payment requires authentication. Redirect the user to this URL.',
                             'data' => [
                                 'requires_action' => true,
-                                'redirect_url' => $redirectUrl,  // ✅ Redirect the user to complete authentication
+                                'redirect_url' => $paymentIntent->next_action->redirect_to_url->url,
                                 'payment_intent_id' => $paymentIntentId,
+                                'subscription_id' => $payment->subscription_id ?? null,
                             ],
                         ], 402);
                     }
-
-                    return response()->json([
-                        'status' => false,
-                        'message' => 'Payment requires authentication but no redirect URL found.',
-                        'data' => [
-                            'requires_action' => true,
-                            'client_secret' => $paymentIntent->client_secret,
-                            'payment_intent_id' => $paymentIntentId,
-                        ],
-                    ], 402);
                 }
 
-
-
                 if ($paymentIntent->status !== 'succeeded') {
-
                     return response()->json([
                         'status' => false,
                         'message' => 'Payment failed. Cannot proceed with subscription.',
@@ -894,65 +362,61 @@ class ApiController extends Controller
                 ], 500);
             }
 
-
-            try {
-                $paymentMethod = \Stripe\PaymentMethod::retrieve($payment->payment_method);
-                $paymentMethod->attach(['customer' => $payment->stripe_customer_id]);
-            } catch (\Stripe\Exception\InvalidRequestException $e) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Invalid PaymentMethod ID.',
-                    'error' => $e->getMessage(),
-                ], 400);
-            }
-
-            // ✅ **Set Default Payment Method for the Customer**
-            \Stripe\Customer::update($payment->stripe_customer_id, [
-                'invoice_settings' => [
-                    'default_payment_method' => $payment->payment_method,
-                ],
-            ]);
-
             // ✅ **Create Subscription After Payment is Confirmed**
-            $subscription = \Stripe\Subscription::create([
-                'customer' => $payment->stripe_customer_id,
-                'items' => [['price' => $priceId]],
-                'default_payment_method' => $payment->payment_method,
-                'expand' => ['latest_invoice.payment_intent'],
-                'payment_behavior' => 'default_incomplete',
-            ]);
+            // try {
+            //     $subscription = \Stripe\Subscription::create([
+            //         'customer' => $payment->stripe_customer_id,
+            //         'items' => [['price' => $priceId]],
+            //         'default_payment_method' => $payment->payment_method,
+            //         'expand' => ['latest_invoice.payment_intent'],
+            //         'payment_behavior' => 'default_incomplete',
+            //     ]);
 
-            // ✅ **Update Payment Record in Database**
-            $payment->update([
-                'subscription_id' => $subscription->id,
-                'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
-            ]);
+            //     if (!isset($subscription->id)) {
+            //         \Log::error('Subscription creation failed. No subscription ID returned.');
+            //         return response()->json([
+            //             'status' => false,
+            //             'message' => 'Subscription creation failed.',
+            //         ], 500);
+            //     }
 
-            $user->update([
-                'subscription_id' => $subscription->id,
-            ]);
+            //     // ✅ **Update Payment Record in Database**
+            //     DB::beginTransaction();
+            //     $payment->update([
+            //         'subscription_id' => $subscription->id,
+            //         'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
+            //     ]);
 
+            //     $user->update(['subscription_id' => $subscription->id]);
+            //     DB::commit();
 
-            return response()->json([
-                'status' => true,
-                'message' => 'Subscription activated successfully.',
-                'data' => [
-                    'subscription_id' => $subscription->id,
-                    'status' => $subscription->status,
-                ],
-            ]);
-        } catch (\Stripe\Exception\ApiErrorException $e) {
-            \Log::error('Failed to create subscription.', ['error' => $e->getMessage()]);
+            //     return response()->json([
+            //         'status' => true,
+            //         'message' => 'Subscription activated successfully.',
+            //         'data' => [
+            //             'subscription_id' => $subscription->id,
+            //             'status' => $subscription->status,
+            //             'return_url' => $returnUrl,
+            //         ],
+            //     ]);
+            // } catch (\Exception $e) {
+            //     DB::rollBack();
+            //     \Log::error('Failed to update subscription in database.', ['error' => $e->getMessage()]);
+            //     return response()->json([
+            //         'status' => false,
+            //         'message' => 'Failed to create subscription.',
+            //         'error' => $e->getMessage(),
+            //     ], 500);
+            // }
+        } catch (\Exception $e) {
+            \Log::error('Unexpected error in subscription process.', ['error' => $e->getMessage()]);
             return response()->json([
                 'status' => false,
-                'message' => 'Failed to create subscription.',
+                'message' => 'An unexpected error occurred.',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
-
-
-
     // public function subscribe(Request $request)
     // {
     //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
@@ -960,11 +424,13 @@ class ApiController extends Controller
 
     //     try {
     //         // ✅ **Validate Input**
+    //         \Log::info('Validating request data.');
     //         $validator = Validator::make($request->all(), [
     //             'price_id' => 'required|string',
     //         ]);
 
     //         if ($validator->fails()) {
+    //             \Log::warning('Validation failed.', ['errors' => $validator->errors()]);
     //             return response()->json([
     //                 'status' => false,
     //                 'message' => 'Validation error',
@@ -973,95 +439,113 @@ class ApiController extends Controller
     //         }
 
     //         $priceId = trim(filter_var($request->price_id, FILTER_SANITIZE_STRING));
-    //         $user = Auth::user();
 
-    //         // ✅ **Fetch User Payment Details**
+    //         // ✅ **Fetch User and Payment Details**
+    //         $user = Auth::user();
     //         $payment = Payment::where('user_id', $user->id)
     //             ->whereNotNull('payment_intent_id')
     //             ->latest()
     //             ->first();
 
-    //         if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id) {
+    //         if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
+    //             \Log::error('No valid payment method, customer ID, or payment intent found.', ['user_id' => $user->id]);
     //             return response()->json([
     //                 'status' => false,
-    //                 'message' => 'No valid payment method or customer ID found for the user.',
+    //                 'message' => 'No valid payment method, customer ID, or payment intent found for the user.',
     //             ], 404);
     //         }
 
-    //         // ✅ **Create Subscription FIRST**
-    //         \Log::info('Creating subscription for user.', ['user_id' => $user->id]);
+    //         $paymentIntentId = $payment->payment_intent_id;
+    //         \Log::info('Retrieved payment intent.', ['payment_intent_id' => $paymentIntentId]);
 
-    //         $subscription = \Stripe\Subscription::create([
-    //             'customer' => $payment->stripe_customer_id,
-    //             'items' => [['price' => $priceId]],
-    //             'default_payment_method' => $payment->payment_method,
-    //             'payment_behavior' => 'default_incomplete', // ✅ Allows incomplete payments
-    //             'expand' => ['latest_invoice.payment_intent'],
-    //         ]);
+    //         // ✅ **Set return URL before use**
+    //         $returnUrl = url('/api/payment-confirmation?payment_intent=' . $paymentIntentId);
 
-    //         \Log::info('Subscription created.', ['subscription_id' => $subscription->id]);
+    //         // ✅ **Confirm the PaymentIntent (if required)**
+    //         try {
+    //             \Log::info('Fetching PaymentIntent from Stripe.', ['payment_intent_id' => $paymentIntentId]);
+    //             $paymentIntent = \Stripe\PaymentIntent::retrieve($paymentIntentId);
 
-    //         // ✅ **Retrieve PaymentIntent from Subscription**
-    //         $subscriptionPaymentIntent = $subscription->latest_invoice->payment_intent ?? null;
+    //             if (in_array($paymentIntent->status, ['requires_action', 'requires_confirmation'])) {
+    //                 \Log::info('PaymentIntent requires confirmation, attempting to confirm.', ['status' => $paymentIntent->status]);
+    //                 $paymentIntent = $paymentIntent->confirm(['return_url' => $returnUrl]);
 
-    //         if (!$subscriptionPaymentIntent) {
+    //                 if ($paymentIntent->status === 'requires_action' && isset($paymentIntent->next_action->redirect_to_url)) {
+    //                     return response()->json([
+    //                         'status' => false,
+    //                         'message' => 'Payment requires authentication. Redirect the user to this URL.',
+    //                         'data' => [
+    //                             'requires_action' => true,
+    //                             'redirect_url' => $paymentIntent->next_action->redirect_to_url->url,
+    //                             'payment_intent_id' => $paymentIntentId,
+    //                             'subscription_id' => $payment->subscription_id ?? null,
+    //                         ],
+    //                     ], 402);
+    //                 }
+    //             }
+
+    //             if ($paymentIntent->status !== 'succeeded') {
+    //                 return response()->json([
+    //                     'status' => false,
+    //                     'message' => 'Payment failed. Cannot proceed with subscription.',
+    //                     'data' => [
+    //                         'payment_intent_status' => $paymentIntent->status,
+    //                     ],
+    //                 ], 402);
+    //             }
+    //         } catch (\Stripe\Exception\ApiErrorException $e) {
     //             return response()->json([
     //                 'status' => false,
-    //                 'message' => 'Failed to retrieve subscription payment intent.',
+    //                 'message' => 'Error confirming payment intent.',
+    //                 'error' => $e->getMessage(),
     //             ], 500);
     //         }
 
-    //         // ✅ **Store Subscription ID in Database**
-    //         $payment->update([
-    //             'subscription_id' => $subscription->id,
-    //             'status' => 'requires_action',
-    //         ]);
+    //         // ✅ **Use Existing Subscription from Payment Record**
+    //         $subscriptionId = $payment->subscription_id;
 
-    //         // ✅ **Check if Authentication is Needed**
-    //         if ($subscriptionPaymentIntent->status === 'requires_action') {
+    //         if (!$subscriptionId) {
+    //             \Log::error('Subscription ID not found in payment record.', ['payment_id' => $payment->id]);
     //             return response()->json([
     //                 'status' => false,
-    //                 'message' => 'Payment requires authentication.',
-    //                 'data' => [
-    //                     'requires_action' => true,
-    //                     'client_secret' => $subscriptionPaymentIntent->client_secret,
-    //                     'payment_intent_id' => $subscriptionPaymentIntent->id,
-    //                     'subscription_id' => $subscription->id, // ✅ Now we include subscription_id
-    //                 ],
-    //             ], 402);
+    //                 'message' => 'No existing subscription found. Please contact support.',
+    //             ], 404);
     //         }
 
-    //         // ✅ **Check if Payment is Successful**
-    //         if ($subscriptionPaymentIntent->status === 'succeeded') {
-    //             $payment->update(['status' => 'successful']);
+    //         // ✅ **Retrieve Subscription from Stripe**
+    //         try {
+    //             $subscription = \Stripe\Subscription::retrieve($subscriptionId);
 
     //             return response()->json([
     //                 'status' => true,
-    //                 'message' => 'Subscription activated successfully.',
+    //                 'message' => 'Subscription retrieved successfully.',
     //                 'data' => [
     //                     'subscription_id' => $subscription->id,
-    //                     'status' => 'active',
+    //                     'status' => $subscription->status,
+    //                     'return_url' => $returnUrl,
     //                 ],
     //             ]);
+    //         } catch (\Stripe\Exception\ApiErrorException $e) {
+    //             \Log::error('Failed to retrieve subscription from Stripe.', ['error' => $e->getMessage()]);
+    //             return response()->json([
+    //                 'status' => false,
+    //                 'message' => 'Failed to retrieve subscription details.',
+    //                 'error' => $e->getMessage(),
+    //             ], 500);
     //         }
-
-    //         // ✅ **If Payment is Pending**
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Subscription created but payment is pending.',
-    //             'data' => [
-    //                 'subscription_id' => $subscription->id,
-    //                 'status' => $subscriptionPaymentIntent->status,
-    //             ],
-    //         ]);
-    //     } catch (\Stripe\Exception\ApiErrorException $e) {
+    //     } catch (\Exception $e) {
+    //         \Log::error('Unexpected error in subscription process.', ['error' => $e->getMessage()]);
     //         return response()->json([
     //             'status' => false,
-    //             'message' => 'Failed to create subscription.',
+    //             'message' => 'An unexpected error occurred.',
     //             'error' => $e->getMessage(),
     //         ], 500);
     //     }
     // }
+
+
+
+
 
     public function confirmSubscription(Request $request)
     {
@@ -1112,18 +596,18 @@ class ApiController extends Controller
             \Log::info('PaymentIntent Details:', (array) $paymentIntent);
 
             // ✅ Handle 3D Secure Authentication
-            if ($paymentIntent->status === 'requires_action') {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Payment requires authentication.',
-                    'data' => [
-                        'requires_action' => true,
-                        'client_secret' => $paymentIntent->client_secret,
-                        'payment_intent_id' => $paymentIntent->id,
-                        'subscription_id' => $subscriptionId,
-                    ],
-                ], 402);
-            }
+            // if ($paymentIntent->status === 'requires_action') {
+            //     return response()->json([
+            //         'status' => false,
+            //         'message' => 'Payment requires authentication.',
+            //         'data' => [
+            //             'requires_action' => true,
+            //             'client_secret' => $paymentIntent->client_secret,
+            //             'payment_intent_id' => $paymentIntent->id,
+            //             'subscription_id' => $subscriptionId,
+            //         ],
+            //     ], 402);
+            // }
 
             // ✅ Handle Requires Confirmation (Frontend must confirm it)
             if ($paymentIntent->status === 'requires_confirmation') {

@@ -101,8 +101,6 @@ Route::group([
         Route::post('/{id}/approve', 'is_approved');
     });
 
-
-
 });
 
 Route::get('/payment-confirmation', function (Request $request) {
@@ -117,9 +115,7 @@ Route::get('/payment-confirmation', function (Request $request) {
     try {
         $paymentIntent = \Stripe\PaymentIntent::retrieve($paymentIntentId);
 
-        // ✅ If PaymentIntent requires confirmation, confirm it with return_url
         if ($paymentIntent->status === 'requires_confirmation') {
-            \Log::info('🔄 Re-confirming PaymentIntent.', ['payment_intent_id' => $paymentIntentId]);
 
             $paymentIntent = $paymentIntent->confirm([
                 'return_url' => url('/api/payment-confirmation') // ✅ Set a valid return URL
@@ -127,9 +123,7 @@ Route::get('/payment-confirmation', function (Request $request) {
         }
 
         if ($paymentIntent->status === 'succeeded') {
-            \Log::info('✅ Payment completed successfully.', ['payment_intent_id' => $paymentIntentId]);
 
-            // ✅ Update the payment status in the database
             Payment::where('payment_intent_id', $paymentIntentId)->update([
                 'status' => 'successful',
             ]);
@@ -143,7 +137,6 @@ Route::get('/payment-confirmation', function (Request $request) {
                 ],
             ]);
         } else {
-            \Log::info('⚠️ Payment still incomplete.', ['payment_intent_id' => $paymentIntentId]);
 
             return response()->json([
                 'status' => false,
@@ -154,7 +147,6 @@ Route::get('/payment-confirmation', function (Request $request) {
             ]);
         }
     } catch (\Exception $e) {
-        \Log::error('❌ Error retrieving or confirming payment intent.', ['error' => $e->getMessage()]);
         return response()->json([
             'status' => false,
             'message' => 'Error retrieving or confirming payment intent.',
