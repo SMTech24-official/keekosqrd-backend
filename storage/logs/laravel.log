@@ -72,3 +72,12 @@
 [2025-02-16 11:54:26] local.INFO: Processing RegisterUser: {"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test5@test.com","password":"12345678"} 
 [2025-02-16 11:54:26] local.INFO: User created successfully {"user":{"App\\Models\\User":{"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test5@test.com","is_admin":false,"updated_at":"2025-02-16T11:54:26.000000Z","created_at":"2025-02-16T11:54:26.000000Z","id":6}}} 
 [2025-02-16 11:54:26] local.INFO: JWT token generated  
+[2025-02-16 12:10:38] local.INFO: Processing RegisterUser: {"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test6@test.com","password":"12345678"} 
+[2025-02-16 12:10:38] local.INFO: User created successfully {"user":{"App\\Models\\User":{"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test6@test.com","is_admin":false,"updated_at":"2025-02-16T12:10:38.000000Z","created_at":"2025-02-16T12:10:38.000000Z","id":6}}} 
+[2025-02-16 12:10:38] local.INFO: JWT token generated  
+[2025-02-16 12:11:51] local.INFO: Processing RegisterUser: {"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test7@test.com","password":"12345678"} 
+[2025-02-16 12:11:51] local.INFO: User created successfully {"user":{"App\\Models\\User":{"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test7@test.com","is_admin":false,"updated_at":"2025-02-16T12:11:51.000000Z","created_at":"2025-02-16T12:11:51.000000Z","id":8}}} 
+[2025-02-16 12:11:51] local.INFO: JWT token generated  
+[2025-02-16 12:13:07] local.INFO: Processing RegisterUser: {"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test7@test.com","password":"12345678"} 
+[2025-02-16 12:13:07] local.INFO: User created successfully {"user":{"App\\Models\\User":{"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test7@test.com","is_admin":false,"updated_at":"2025-02-16T12:13:07.000000Z","created_at":"2025-02-16T12:13:07.000000Z","id":7}}} 
+[2025-02-16 12:13:07] local.INFO: JWT token generated  
