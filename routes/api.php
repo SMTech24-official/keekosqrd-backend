@@ -134,6 +134,7 @@ Route::get('/payment-confirmation', function (Request $request) {
                 'data' => [
                     'payment_intent_id' => $paymentIntentId,
                     'status' => $paymentIntent->status,
+			'redirect_url' => 'https://www.ksquaredsourcedcity.com/'
                 ],
             ]);
         } else {
