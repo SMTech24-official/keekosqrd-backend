@@ -69,3 +69,6 @@
 [2025-02-16 11:29:21] local.INFO: Retrieved payment intent. {"payment_intent_id":"pi_3Qt62CDgYV6zJ17v3TQlZhzM"} 
 [2025-02-16 11:29:21] local.INFO: Fetching PaymentIntent from Stripe. {"payment_intent_id":"pi_3Qt62CDgYV6zJ17v3TQlZhzM"} 
 [2025-02-16 11:29:21] local.INFO: PaymentIntent requires confirmation, attempting to confirm. {"status":"requires_action"} 
+[2025-02-16 11:54:26] local.INFO: Processing RegisterUser: {"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test5@test.com","password":"12345678"} 
+[2025-02-16 11:54:26] local.INFO: User created successfully {"user":{"App\\Models\\User":{"first_name":"John","last_name":"Doe","country":"USA","city":"s","zip_code":"10001","address":"123 Main Street","email":"test5@test.com","is_admin":false,"updated_at":"2025-02-16T11:54:26.000000Z","created_at":"2025-02-16T11:54:26.000000Z","id":6}}} 
+[2025-02-16 11:54:26] local.INFO: JWT token generated  
