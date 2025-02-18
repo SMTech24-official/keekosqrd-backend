@@ -407,148 +407,148 @@ class ApiController extends Controller
 
 
     // working
-    // public function subscribe(Request $request)
-    // {
-    //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-    //     \Log::info('Subscription process started.', ['user_id' => Auth::id()]);
+    public function subscribe(Request $request)
+    {
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+        \Log::info('Subscription process started.', ['user_id' => Auth::id()]);
 
-    //     try {
-    //         // ✅ **Validate Input**
-    //         \Log::info('Validating request data.');
-    //         $validator = Validator::make($request->all(), [
-    //             'price_id' => 'required|string',
-    //         ]);
+        try {
+            // ✅ **Validate Input**
+            \Log::info('Validating request data.');
+            $validator = Validator::make($request->all(), [
+                'price_id' => 'required|string',
+            ]);
 
-    //         if ($validator->fails()) {
-    //             \Log::warning('Validation failed.', ['errors' => $validator->errors()]);
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Validation error',
-    //                 'errors' => $validator->errors(),
-    //             ], 400);
-    //         }
+            if ($validator->fails()) {
+                \Log::warning('Validation failed.', ['errors' => $validator->errors()]);
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ], 400);
+            }
 
-    //         $priceId = trim(filter_var($request->price_id, FILTER_SANITIZE_STRING));
+            $priceId = trim(filter_var($request->price_id, FILTER_SANITIZE_STRING));
 
-    //         // ✅ **Fetch User and Payment Details**
-    //         $user = Auth::user();
-    //         $payment = Payment::where('user_id', $user->id)
-    //             ->whereNotNull('payment_intent_id')
-    //             ->latest()
-    //             ->first();
+            // ✅ **Fetch User and Payment Details**
+            $user = Auth::user();
+            $payment = Payment::where('user_id', $user->id)
+                ->whereNotNull('payment_intent_id')
+                ->latest()
+                ->first();
 
-    //         if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
-    //             \Log::error('No valid payment method, customer ID, or payment intent found.', ['user_id' => $user->id]);
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'No valid payment method, customer ID, or payment intent found for the user.',
-    //             ], 404);
-    //         }
+            if (!$payment || !$payment->payment_method || !$payment->stripe_customer_id || !$payment->payment_intent_id) {
+                \Log::error('No valid payment method, customer ID, or payment intent found.', ['user_id' => $user->id]);
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No valid payment method, customer ID, or payment intent found for the user.',
+                ], 404);
+            }
 
-    //         $paymentIntentId = $payment->payment_intent_id;
-    //         \Log::info('Retrieved payment intent.', ['payment_intent_id' => $paymentIntentId]);
+            $paymentIntentId = $payment->payment_intent_id;
+            \Log::info('Retrieved payment intent.', ['payment_intent_id' => $paymentIntentId]);
 
-    //         // ✅ **Set return URL before use**
-    //         $returnUrl = url('/api/payment-confirmation?payment_intent=' . $paymentIntentId);
-    //         // $returnUrl = url('https://www.ksquaredsourcedcity.com');
+            // ✅ **Set return URL before use**
+            $returnUrl = url('/api/payment-confirmation?payment_intent=' . $paymentIntentId);
+            // $returnUrl = url('https://www.ksquaredsourcedcity.com');
 
-    //         // ✅ **Confirm the PaymentIntent (if required)**
-    //         try {
-    //             \Log::info('Fetching PaymentIntent from Stripe.', ['payment_intent_id' => $paymentIntentId]);
-    //             $paymentIntent = \Stripe\PaymentIntent::retrieve($paymentIntentId);
+            // ✅ **Confirm the PaymentIntent (if required)**
+            try {
+                \Log::info('Fetching PaymentIntent from Stripe.', ['payment_intent_id' => $paymentIntentId]);
+                $paymentIntent = \Stripe\PaymentIntent::retrieve($paymentIntentId);
 
-    //             if (in_array($paymentIntent->status, ['requires_action', 'requires_confirmation'])) {
-    //                 \Log::info('PaymentIntent requires confirmation, attempting to confirm.', ['status' => $paymentIntent->status]);
+                if (in_array($paymentIntent->status, ['requires_action', 'requires_confirmation'])) {
+                    \Log::info('PaymentIntent requires confirmation, attempting to confirm.', ['status' => $paymentIntent->status]);
 
-    //                 $paymentIntent = $paymentIntent->confirm(['return_url' => $returnUrl]);
+                    $paymentIntent = $paymentIntent->confirm(['return_url' => $returnUrl]);
 
-    //                 if ($paymentIntent->status === 'requires_action' && isset($paymentIntent->next_action->redirect_to_url)) {
-    //                     return response()->json([
-    //                         'status' => false,
-    //                         'message' => 'Payment requires authentication. Redirect the user to this URL.',
-    //                         'data' => [
-    //                             'requires_action' => true,
-    //                             'redirect_url' => $paymentIntent->next_action->redirect_to_url->url,
-    //                             'payment_intent_id' => $paymentIntentId,
-    //                             'subscription_id' => $payment->subscription_id ?? null,
-    //                         ],
-    //                     ], 402);
-    //                 }
-    //             }
+                    if ($paymentIntent->status === 'requires_action' && isset($paymentIntent->next_action->redirect_to_url)) {
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'Payment requires authentication. Redirect the user to this URL.',
+                            'data' => [
+                                'requires_action' => true,
+                                'redirect_url' => $paymentIntent->next_action->redirect_to_url->url,
+                                'payment_intent_id' => $paymentIntentId,
+                                'subscription_id' => $payment->subscription_id ?? null,
+                            ],
+                        ], 402);
+                    }
+                }
 
 
-    //             if ($paymentIntent->status !== 'succeeded') {
-    //                 return response()->json([
-    //                     'status' => false,
-    //                     'message' => 'Payment failed. Cannot proceed with subscription.',
-    //                     'data' => [
-    //                         'payment_intent_status' => $paymentIntent->status,
-    //                     ],
-    //                 ], 402);
-    //             }
-    //         } catch (\Stripe\Exception\ApiErrorException $e) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Error confirming payment intent.',
-    //                 'error' => $e->getMessage(),
-    //             ], 500);
-    //         }
+                if ($paymentIntent->status !== 'succeeded') {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Payment failed. Cannot proceed with subscription.',
+                        'data' => [
+                            'payment_intent_status' => $paymentIntent->status,
+                        ],
+                    ], 402);
+                }
+            } catch (\Stripe\Exception\ApiErrorException $e) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Error confirming payment intent.',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
 
-    //         // ✅ **Create Subscription After Payment is Confirmed**
-    //         // try {
-    //         //     $subscription = \Stripe\Subscription::create([
-    //         //         'customer' => $payment->stripe_customer_id,
-    //         //         'items' => [['price' => $priceId]],
-    //         //         'default_payment_method' => $payment->payment_method,
-    //         //         'expand' => ['latest_invoice.payment_intent'],
-    //         //         'payment_behavior' => 'default_incomplete',
-    //         //     ]);
+            // ✅ **Create Subscription After Payment is Confirmed**
+            // try {
+            //     $subscription = \Stripe\Subscription::create([
+            //         'customer' => $payment->stripe_customer_id,
+            //         'items' => [['price' => $priceId]],
+            //         'default_payment_method' => $payment->payment_method,
+            //         'expand' => ['latest_invoice.payment_intent'],
+            //         'payment_behavior' => 'default_incomplete',
+            //     ]);
 
-    //         //     if (!isset($subscription->id)) {
-    //         //         \Log::error('Subscription creation failed. No subscription ID returned.');
-    //         //         return response()->json([
-    //         //             'status' => false,
-    //         //             'message' => 'Subscription creation failed.',
-    //         //         ], 500);
-    //         //     }
+            //     if (!isset($subscription->id)) {
+            //         \Log::error('Subscription creation failed. No subscription ID returned.');
+            //         return response()->json([
+            //             'status' => false,
+            //             'message' => 'Subscription creation failed.',
+            //         ], 500);
+            //     }
 
-    //         //     // ✅ **Update Payment Record in Database**
-    //         //     DB::beginTransaction();
-    //         //     $payment->update([
-    //         //         'subscription_id' => $subscription->id,
-    //         //         'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
-    //         //     ]);
+            //     // ✅ **Update Payment Record in Database**
+            //     DB::beginTransaction();
+            //     $payment->update([
+            //         'subscription_id' => $subscription->id,
+            //         'status' => $subscription->status === 'active' ? 'successful' : 'incomplete',
+            //     ]);
 
-    //         //     $user->update(['subscription_id' => $subscription->id]);
-    //         //     DB::commit();
+            //     $user->update(['subscription_id' => $subscription->id]);
+            //     DB::commit();
 
-    //         //     return response()->json([
-    //         //         'status' => true,
-    //         //         'message' => 'Subscription activated successfully.',
-    //         //         'data' => [
-    //         //             'subscription_id' => $subscription->id,
-    //         //             'status' => $subscription->status,
-    //         //             'return_url' => $returnUrl,
-    //         //         ],
-    //         //     ]);
-    //         // } catch (\Exception $e) {
-    //         //     DB::rollBack();
-    //         //     \Log::error('Failed to update subscription in database.', ['error' => $e->getMessage()]);
-    //         //     return response()->json([
-    //         //         'status' => false,
-    //         //         'message' => 'Failed to create subscription.',
-    //         //         'error' => $e->getMessage(),
-    //         //     ], 500);
-    //         // }
-    //     } catch (\Exception $e) {
-    //         \Log::error('Unexpected error in subscription process.', ['error' => $e->getMessage()]);
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'An unexpected error occurred.',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
+            //     return response()->json([
+            //         'status' => true,
+            //         'message' => 'Subscription activated successfully.',
+            //         'data' => [
+            //             'subscription_id' => $subscription->id,
+            //             'status' => $subscription->status,
+            //             'return_url' => $returnUrl,
+            //         ],
+            //     ]);
+            // } catch (\Exception $e) {
+            //     DB::rollBack();
+            //     \Log::error('Failed to update subscription in database.', ['error' => $e->getMessage()]);
+            //     return response()->json([
+            //         'status' => false,
+            //         'message' => 'Failed to create subscription.',
+            //         'error' => $e->getMessage(),
+            //     ], 500);
+            // }
+        } catch (\Exception $e) {
+            \Log::error('Unexpected error in subscription process.', ['error' => $e->getMessage()]);
+            return response()->json([
+                'status' => false,
+                'message' => 'An unexpected error occurred.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
     public function login(Request $request)
     {
