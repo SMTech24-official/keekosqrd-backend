@@ -32,7 +32,7 @@ Route::group([
     "middleware" => ["auth:api"]
 ], function () {
 
-    Route::post('/register-subscription',[SubscriptionController::class, 'registerSubscription']);
+    Route::post('/register-subscription', [SubscriptionController::class, 'registerSubscription']);
 
     Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
     Route::post('/subscribe', [ApiController::class, 'subscribe'])->name('api.subscribe');
@@ -96,8 +96,55 @@ Route::group([
         Route::post('/{id}', 'update');
         Route::post('/{id}/approve', 'is_approved');
     });
-
 });
+
+// Route::get('/payment-confirmation', function (Request $request) {
+//     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+//     $paymentIntentId = $request->query('payment_intent');
+
+//     if (!$paymentIntentId) {
+//         return response()->json(['status' => false, 'message' => 'Missing payment intent ID.'], 400);
+//     }
+
+//     try {
+//         // Retrieve the PaymentIntent object
+//         $paymentIntent = \Stripe\PaymentIntent::retrieve($paymentIntentId);
+
+//         // If the PaymentIntent requires confirmation (requires_action)
+//         if ($paymentIntent->status === 'requires_action' || $paymentIntent->status === 'requires_confirmation') {
+//             // If we are in the requires_action state, confirm again with return_url for redirection to complete authentication
+//             $paymentIntent = $paymentIntent->confirm([
+//                 'return_url' => url('/payment-success'), // Your success page here
+//             ]);
+//         }
+
+//         // Check if payment is successful
+//         if ($paymentIntent->status === 'succeeded') {
+//             Payment::where('payment_intent_id', $paymentIntentId)->update([
+//                 'status' => 'successful',
+//             ]);
+
+//             return redirect(url('/payment-success')); // Redirect to your success page
+//         } else {
+//             return response()->json([
+//                 'status' => false,
+//                 'message' => 'Payment still incomplete. Please wait a moment and refresh.',
+//                 'data' => [
+//                     'status' => $paymentIntent->status,
+//                 ],
+//             ]);
+//         }
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'status' => false,
+//             'message' => 'Error retrieving or confirming payment intent.',
+//             'error' => $e->getMessage(),
+//         ], 500);
+//     }
+// });
+
+
 
 Route::get('/payment-confirmation', function (Request $request) {
     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
@@ -142,17 +189,3 @@ Route::get('/payment-confirmation', function (Request $request) {
         ], 500);
     }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
