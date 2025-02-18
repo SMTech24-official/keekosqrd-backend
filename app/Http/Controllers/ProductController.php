@@ -331,7 +331,7 @@ class ProductController extends Controller
 
             // Check if the user has an active subscription
             $subscription = Payment::where('user_id', $userId)
-                ->where('status', 'successful')
+                ->where('status', 'succeeded')
                 ->first();
 
             // Debug: Log subscription check
