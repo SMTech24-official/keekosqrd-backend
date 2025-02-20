@@ -32,13 +32,8 @@ Route::group([
     "middleware" => ["auth:api"]
 ], function () {
 
-    Route::post('/register-subscription', [SubscriptionController::class, 'registerSubscription']);
-
     Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
     Route::post('/subscribe', [ApiController::class, 'subscribe'])->name('api.subscribe');
-    Route::post('/confirm-subscription', [ApiController::class, 'confirmSubscription']);
-
-
 
     Route::patch('/users/{user}/approve', [ApiController::class, 'approveUser']);
 
@@ -96,6 +91,13 @@ Route::group([
         Route::post('/{id}', 'update');
         Route::post('/{id}/approve', 'is_approved');
     });
+
+
+
+    Route::post('checkout', [SubscriptionController::class, 'checkout']);
+ 
+
+
 });
 
 // Route::get('/payment-confirmation', function (Request $request) {

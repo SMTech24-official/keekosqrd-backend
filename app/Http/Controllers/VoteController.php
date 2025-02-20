@@ -170,18 +170,15 @@ class VoteController extends Controller
     public function makeWiner(Request $request, $id, $month, $year)
     {
         try {
-            // Validate the request
             $data = $request->validate([
                 'status' => 'required|boolean',
             ]);
 
-            // Ensure the user is authenticated and authorized (admin)
             $user = Auth::user();
             if (!$user || !$user->is_admin) {
                 return response()->json(['error' => 'Unauthorized action.'], 403);
             }
 
-            // Check if a winner already exists for the given month and year
             $existingWinner = Vote::where('status', true)
                 ->whereMonth('created_at', $month)
                 ->whereYear('created_at', $year)
@@ -199,10 +196,8 @@ class VoteController extends Controller
                 return response()->json(['error' => 'Vote not found.'], 404);
             }
 
-            // Update the vote status to make this user the winner
             $vote->update(['status' => $data['status']]);
 
-            // Fetch the winner and product details
             $winner = User::find($vote->user_id);
             $product = Product::find($vote->product_id);
 
@@ -215,7 +210,6 @@ class VoteController extends Controller
 
             return response()->json(['message' => 'Winner selected and email sent successfully.'], 200);
         } catch (\Exception $e) {
-            // Log the error and return an appropriate response
             \Log::error('Error in makeWiner method: ' . $e->getMessage());
             return response()->json(['error' => 'An error occurred. Please try again later.'], 500);
         }

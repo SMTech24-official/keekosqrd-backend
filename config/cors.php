@@ -27,7 +27,6 @@ return [
         'https://dashboard.ksquaredsourcedcity.com',
         'http://localhost:3000',
         'http://localhost:3001',
-
     ],
 
     'allowed_origins' => ['*'],
