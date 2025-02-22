@@ -103,18 +103,23 @@ class SubscriptionController extends Controller
     //     }
     // }
 
-    // public function resume()
-    // {
-    //     $user = auth()->user();
-    //     $activeDefultSubscription = $user->subscription('default');
+    public function resumeSubscription()
+    {
+        $user = auth()->user();
+        $activeDefultSubscription = $user->subscription('default');
 
-    //     $activeDefultSubscription->resume();
+        $activeDefultSubscription->resume();
 
-    //     return response()->json(['message' => 'Subscription resumed!']);
-    // }
+        return response()->json(['message' => 'Subscription resumed!']);
+    }
 
 
-
+    public function cancelSubscription()
+    {
+        $user = auth()->user();
+        $user->subscription('default')->cancel();
+        return response()->json(['message' => 'Subscription canceled!']);
+    }
 
 
     // Route::get('subscriptions/resume', function () {
