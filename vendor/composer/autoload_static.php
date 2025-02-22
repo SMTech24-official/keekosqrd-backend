@@ -3819,7 +3819,6 @@ class ComposerStaticInitb690859e3aa60c08bfe8f3817d07d959
         'Laravel\\Cashier\\Exceptions\\InvalidPaymentMethod' => __DIR__ . '/..' . '/laravel/cashier/src/Exceptions/InvalidPaymentMethod.php',
         'Laravel\\Cashier\\Exceptions\\SubscriptionUpdateFailure' => __DIR__ . '/..' . '/laravel/cashier/src/Exceptions/SubscriptionUpdateFailure.php',
         'Laravel\\Cashier\\Http\\Controllers\\PaymentController' => __DIR__ . '/..' . '/laravel/cashier/src/Http/Controllers/PaymentController.php',
-        'Laravel\\Cashier\\Http\\Controllers\\WebhookController' => __DIR__ . '/..' . '/laravel/cashier/src/Http/Controllers/WebhookController.php',
         'Laravel\\Cashier\\Http\\Middleware\\VerifyRedirectUrl' => __DIR__ . '/..' . '/laravel/cashier/src/Http/Middleware/VerifyRedirectUrl.php',
         'Laravel\\Cashier\\Http\\Middleware\\VerifyWebhookSignature' => __DIR__ . '/..' . '/laravel/cashier/src/Http/Middleware/VerifyWebhookSignature.php',
         'Laravel\\Cashier\\Invoice' => __DIR__ . '/..' . '/laravel/cashier/src/Invoice.php',

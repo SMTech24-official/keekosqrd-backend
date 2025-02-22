@@ -39,7 +39,10 @@ class VerifyCsrfToken
      *
      * @var array<int, string>
      */
-    protected $except = [];
+    // protected $except = [];
+    protected $except = [
+        '/stripe/webhook',  // Ensure this matches the actual URL endpoint configured in Stripe
+    ];
 
     /**
      * The globally ignored URIs that should be excluded from CSRF verification.

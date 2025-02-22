@@ -39,8 +39,11 @@ class WebhookController extends Controller
      */
     public function handleWebhook(Request $request)
     {
+        // Log the entire request payload
+
         $payload = json_decode($request->getContent(), true);
-        $method = 'handle'.Str::studly(str_replace('.', '_', $payload['type']));
+        $method = 'handle' . Str::studly(str_replace('.', '_', $payload['type']));
+
 
         WebhookReceived::dispatch($payload);
 
@@ -51,11 +54,13 @@ class WebhookController extends Controller
 
             WebhookHandled::dispatch($payload);
 
+
             return $response;
         }
 
         return $this->missingMethod($payload);
     }
+
 
     /**
      * Handle customer subscription created.
@@ -205,6 +210,33 @@ class WebhookController extends Controller
 
         return $this->successMethod();
     }
+
+
+    protected function handleCheckoutSessionCompleted(array $payload)
+    {
+        // Assuming you have a method to find the user or subscription by Stripe's session ID or customer ID
+        $customerId = $payload['data']['object']['customer'];
+        $subscriptionId = $payload['data']['object']['subscription'];
+
+        $user = $this->getUserByStripeId($customerId);
+        if (!$user) {
+            return $this->successMethod();
+        }
+
+        // Retrieve the subscription from your database
+        $subscription = $user->subscriptions()->where('stripe_id', $subscriptionId)->first();
+
+        if ($subscription) {
+            // Update subscription status based on webhook data
+            $subscription->stripe_status = 'active'; // Set to active or any other status based on your requirement
+            $subscription->save();
+
+        } else {
+        }
+
+        return $this->successMethod();
+    }
+
 
     /**
      * Handle the cancellation of a customer subscription.

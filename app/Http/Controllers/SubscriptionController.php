@@ -10,9 +10,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Cashier\Exceptions\IncompletePayment;
 
+use Stripe\Checkout\Session as StripeSession;
+
 
 class SubscriptionController extends Controller
 {
+
     public function checkout(Request $request)
     {
         $user = auth()->user();
@@ -55,6 +58,50 @@ class SubscriptionController extends Controller
             return response()->json(['error' => $e->getMessage()], 400);
         }
     }
+
+
+    // public function checkout(Request $request)
+    // {
+    //     $user = auth()->user();
+
+    //     // Set your secret Stripe API key
+    //     Stripe::setApiKey(config('cashier.secret'));
+
+    //     // Stripe price ID for the subscription (create this in your Stripe Dashboard)
+    //     $stripePriceId = 'price_1QmbEQDgYV6zJ17vhlyPX5Vb'; // Replace with your actual recurring price ID
+
+    //     // Create Stripe customer if one does not exist
+    //     if (!$user->hasStripeId()) {
+    //         $user->createAsStripeCustomer();
+    //     }
+
+    //     // Create a Stripe Checkout session
+    //     try {
+    //         $checkoutSession = Session::create([
+    //             'payment_method_types' => ['card'],
+    //             'line_items' => [
+    //                 [
+    //                     'price' => $stripePriceId,
+    //                     'quantity' => 1,
+    //                 ],
+    //             ],
+    //             'mode' => 'subscription', // Set the mode to subscription for recurring payments
+    //             'customer' => $user->stripe_id,
+    //             // 'success_url' => route('checkout-success'),
+    //             // 'cancel_url' => route('checkout-cancel'),
+    //             'success_url' => 'https://www.ksquaredsourcedcity.com/',
+    //             'cancel_url' => 'https://www.ksquaredsourcedcity.com/',
+
+    //         ]);
+
+    //         // Return the session URL for redirect
+    //         return response()->json([
+    //             'url' => $checkoutSession->url,
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         return response()->json(['error' => $e->getMessage()], 400);
+    //     }
+    // }
 
     // public function resume()
     // {

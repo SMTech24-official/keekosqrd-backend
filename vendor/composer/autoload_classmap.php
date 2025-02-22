@@ -3150,7 +3150,6 @@ return array(
     'Laravel\\Cashier\\Exceptions\\InvalidPaymentMethod' => $vendorDir . '/laravel/cashier/src/Exceptions/InvalidPaymentMethod.php',
     'Laravel\\Cashier\\Exceptions\\SubscriptionUpdateFailure' => $vendorDir . '/laravel/cashier/src/Exceptions/SubscriptionUpdateFailure.php',
     'Laravel\\Cashier\\Http\\Controllers\\PaymentController' => $vendorDir . '/laravel/cashier/src/Http/Controllers/PaymentController.php',
-    'Laravel\\Cashier\\Http\\Controllers\\WebhookController' => $vendorDir . '/laravel/cashier/src/Http/Controllers/WebhookController.php',
     'Laravel\\Cashier\\Http\\Middleware\\VerifyRedirectUrl' => $vendorDir . '/laravel/cashier/src/Http/Middleware/VerifyRedirectUrl.php',
     'Laravel\\Cashier\\Http\\Middleware\\VerifyWebhookSignature' => $vendorDir . '/laravel/cashier/src/Http/Middleware/VerifyWebhookSignature.php',
     'Laravel\\Cashier\\Invoice' => $vendorDir . '/laravel/cashier/src/Invoice.php',

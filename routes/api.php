@@ -11,8 +11,12 @@ use App\Http\Controllers\VoteController;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\StripeWebhookController;
+use Laravel\Cashier\Exceptions\IncompletePayment;
+
 
 
 Route::post('/register', [ApiController::class, 'register'])->name('api.register');
@@ -94,11 +98,17 @@ Route::group([
 
 
 
-    Route::post('checkout', [SubscriptionController::class, 'checkout']);
- 
 
+
+
+    Route::post('checkout', [SubscriptionController::class, 'checkout']);
+
+    Route::post('/cancel-subscription', [SubscriptionController::class, 'cancelSubscription']);
+
+    // Route::post('/stripe/webhook', [StripeWebhookController::class, 'handleWebhook']);
 
 });
+
 
 // Route::get('/payment-confirmation', function (Request $request) {
 //     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
