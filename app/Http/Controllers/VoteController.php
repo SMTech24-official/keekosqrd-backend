@@ -18,12 +18,10 @@ class VoteController extends Controller
     public function index($month, $year)
     {
         return $this->safeCall(function () use ($month, $year) {
-            // Check if the user is authenticated
             if (!Auth::check()) {
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
 
-            // Check if the user is an admin
             $user = Auth::user();
 
             if (!$user->is_admin) {
