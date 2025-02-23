@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Stripe\Stripe;
-use App\Models\Payment;
 use App\Models\Vote;
+use App\Models\Payment;
+use Stripe\StripeClient;
 use Illuminate\Http\Request;
+use Laravel\Cashier\Subscription;
 use App\Traits\HandlesApiResponse;
 use Illuminate\Support\Facades\Auth;
 
@@ -29,7 +31,7 @@ class PaymentController extends Controller
             //     ->whereYear('created_at', $year)
             //     ->get();
 
-            $payments = Payment::with('user')
+            $payments = Subscription::with('user')
                 ->whereMonth('created_at', $month)
                 ->whereYear('created_at', $year)
                 ->get();
@@ -47,33 +49,66 @@ class PaymentController extends Controller
         });
     }
 
+    protected $stripe;
+
+    public function __construct()
+    {
+        $this->stripe = new StripeClient(env('STRIPE_SECRET'));
+    }
 
     public function totalPayments()
     {
         return $this->safeCall(function () {
-            // Fetch the authenticated user
             $user = Auth::user();
-
-            // Check if the user is an admin
             if (!$user || !$user->is_admin) {
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
 
-            // Get the current month and year
-            $month = date('m');
-            $year = date('Y');
+            // Assume each subscription stores or can calculate the total amount paid over time
+            $totalPayments = Subscription::where('stripe_status', 'active')
+                ->get()
+                ->reduce(function ($carry, $subscription) {
+                    // Retrieve the total amount paid for this subscription, considering all renewals
+                    $price = $this->stripe->prices->retrieve($subscription->stripe_price);
+                    // If you have stored each payment, you might calculate the total from your database instead
+                    $amountPaid = ($price->unit_amount / 100) * $subscription->billing_cycle_count; // Assuming you track billing cycles
+                    return $carry + $amountPaid;
+                }, 0);
 
-            // Fetch total amount of payments for the current month and year
-            $totalPayments = Payment::whereYear('created_at', $year)
-                ->whereMonth('created_at', $month)
-                ->sum('amount');
-
-            return $this->successResponse(
-                'Total payments retrieved successfully.',
-                ['total_payments' => $totalPayments]
-            );
+            return $this->successResponse('Total payments retrieved successfully.', ['total_payments' => $totalPayments]);
         });
     }
+
+
+    // public function totalPayments()
+    // {
+    //     return $this->safeCall(function () {
+    //         // Fetch the authenticated user
+    //         $user = Auth::user();
+
+    //         // Check if the user is an admin
+    //         if (!$user || !$user->is_admin) {
+    //             return $this->errorResponse('You are not authorized to perform this action.', 403);
+    //         }
+
+    //         // Get the current month and year
+    //         $month = date('m');
+    //         $year = date('Y');
+
+    //         $totalActiveSubscriptions = Subscription::where('stripe_status', 'active')
+    //             ->whereYear('created_at', $year)
+    //             ->whereMonth('created_at', $month)
+    //             ->count();  // Count active subscriptions
+
+    //         $totalPayments = $totalActiveSubscriptions * 10;  // Multiply by 10 as per your requirement
+
+
+    //         return $this->successResponse(
+    //             'Total payments retrieved successfully.',
+    //             ['total_payments' => $totalPayments]
+    //         );
+    //     });
+    // }
 
 
 
@@ -93,7 +128,7 @@ class PaymentController extends Controller
             $year = date('Y');
 
             // Fetch the total number of members for the current month and year
-            $totalMembers = Payment::whereYear('created_at', $year)
+            $totalMembers = Subscription::whereYear('created_at', $year)
                 ->whereMonth('created_at', $month)
                 ->count();
 
@@ -120,7 +155,7 @@ class PaymentController extends Controller
             }
 
             // Fetch all payments associated with the authenticated user
-            $payments = Payment::where('user_id', $user->id)->get();
+            $payments = Subscription::where('user_id', $user->id)->get();
 
             // Check if no payments were found
             if ($payments->isEmpty()) {
