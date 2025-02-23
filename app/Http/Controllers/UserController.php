@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Traits\HandlesApiResponse;
 use Illuminate\Support\Facades\Auth;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Hash;
 class UserController extends Controller
 {
     use HandlesApiResponse;
+
 
     public function updateProfile(Request $request)
     {
@@ -53,4 +55,16 @@ class UserController extends Controller
             );
         });
     }
+
+    public function destroy(User $user)
+    {
+        return $this->safeCall(function () use ($user) {
+            $user->delete();
+            return $this->successResponse(
+                'User deleted successfully.',
+                ['user' => $user] // Optionally, include minimal user info or remove if considered sensitive
+            );
+        });
+    }
+
 }

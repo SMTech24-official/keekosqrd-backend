@@ -36,6 +36,9 @@ Route::group([
     "middleware" => ["auth:api"]
 ], function () {
 
+    Route::delete('user/destroy/{user}', [UserController::class, 'destroy']);
+
+
     Route::post('/create-payment-intent', [ApiController::class, 'createPaymentIntent']);
     Route::post('/subscribe', [ApiController::class, 'subscribe'])->name('api.subscribe');
 
