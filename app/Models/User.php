@@ -8,6 +8,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Cashier\Billable;
+use Laravel\Cashier\Subscription;
 
 class User extends Authenticatable implements JWTSubject
 {
@@ -83,8 +84,8 @@ class User extends Authenticatable implements JWTSubject
 
     public function payments()
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Subscription::class);
     }
-    
+
 
 }
