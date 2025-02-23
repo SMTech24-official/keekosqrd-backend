@@ -64,16 +64,15 @@ class PaymentController extends Controller
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
 
-            // Assume each subscription stores or can calculate the total amount paid over time
-            $totalPayments = Subscription::where('stripe_status', 'active')
-                ->get()
-                ->reduce(function ($carry, $subscription) {
-                    // Retrieve the total amount paid for this subscription, considering all renewals
-                    $price = $this->stripe->prices->retrieve($subscription->stripe_price);
-                    // If you have stored each payment, you might calculate the total from your database instead
-                    $amountPaid = ($price->unit_amount / 100) * $subscription->billing_cycle_count; // Assuming you track billing cycles
-                    return $carry + $amountPaid;
-                }, 0);
+            $subscriptions = Subscription::where('stripe_status', 'active')->get();
+            $totalPayments = 0;
+
+            foreach ($subscriptions as $subscription) {
+                $price = $this->stripe->prices->retrieve($subscription->stripe_price);
+                // Assuming each subscription record has a 'renewal_count' that tracks the number of renewals
+                $numPayments = max($subscription->renewal_count, 1); // Ensure at least one payment is counted
+                $totalPayments += ($price->unit_amount / 100) * $numPayments; // Multiply by the number of payments
+            }
 
             return $this->successResponse('Total payments retrieved successfully.', ['total_payments' => $totalPayments]);
         });
