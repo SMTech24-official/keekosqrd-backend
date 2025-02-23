@@ -227,40 +227,48 @@ class ProductController extends Controller
                 return $this->errorResponse('You are not authorized to perform this action.', 403);
             }
 
-            $userId = Auth::id(); // Simpler way to get the user ID
+            $userId = Auth::id();
 
-            // Check if the user has an active subscription
-            $activeDefaultSubscription = Subscription::where('user_id', $userId)
-                ->where('stripe_status', 'active')
-                ->first();
-
-            if (!$activeDefaultSubscription) {
-                return $this->errorResponse('You must be subscribed to vote.', 403);
-            }
-
-            // Check if the product exists and is active
+            // Retrieve the product; ensure it exists and is active before proceeding
             $product = Product::find($productId);
             if (!$product || !$product->status) {
                 return $this->errorResponse('Product not found or is not active.', 404);
             }
 
-            // Check if user has already voted for this product recently based on subscription rules
-            $lastVote = Vote::where('user_id', $userId)
+            // Retrieve the latest active subscription
+            $latestSubscription = Subscription::where('user_id', $userId)
+                ->where('stripe_status', 'active')
                 ->latest('created_at')
                 ->first();
 
-            $timeAllowedBetweenVotes = $this->getTimeAllowedBetweenVotes($activeDefaultSubscription); // Implement this method based on subscription rules
-
-            if ($lastVote && now()->diffInHours($lastVote->created_at) < $timeAllowedBetweenVotes) {
-                return $this->errorResponse('You can only vote once every ' . $timeAllowedBetweenVotes/24 . ' days.', 403);
+            if (!$latestSubscription) {
+                return $this->errorResponse('You must have an active subscription to vote.', 403);
             }
 
+            // Determine the start and end of the current subscription period
+            $subscriptionStart = $latestSubscription->created_at;
+            $subscriptionEnd = $subscriptionStart->copy()->addDays(30);
 
-            // Cast new vote
+            // Check if now is within the current subscription period
+            if (now()->greaterThan($subscriptionEnd)) {
+                return $this->errorResponse('Your subscription period for voting has expired. Please renew your subscription.', 403);
+            }
+
+            // Check if the user has already voted in the current subscription period for any product
+            $alreadyVotedThisPeriod = Vote::where('user_id', $userId)
+                ->whereBetween('created_at', [$subscriptionStart, $subscriptionEnd])
+                ->exists();
+
+            if ($alreadyVotedThisPeriod) {
+                return $this->errorResponse('You have already voted during this subscription period. You cannot vote for multiple products.', 403);
+            }
+
+            // Record the new vote
             $newVote = Vote::create([
                 'user_id' => $userId,
                 'product_id' => $productId,
                 'votes' => 1,
+                'created_at' => now(),  // Ensure timestamps are used to track voting time
             ]);
 
             $totalVotes = Vote::where('product_id', $productId)->sum('votes');
@@ -272,18 +280,74 @@ class ProductController extends Controller
         });
     }
 
-    // Example helper method to determine time allowed between votes
-    // Example helper method to determine time allowed between votes
-    protected function getTimeAllowedBetweenVotes($subscription)
-    {
-        // Adjust the return value based on the type or other attributes of the subscription
-        switch ($subscription->type_id) {
-            case 'default':
-                return 24 * 30; // 30 days expressed in hours
-            default:
-                return 24 * 30; // Adjust as necessary for different subscription types
-        }
-    }
+
+
+
+
+    // public function vote(Request $request, $productId)
+    // {
+    //     return $this->safeCall(function () use ($productId) {
+    //         if (!Auth::check()) {
+    //             return $this->errorResponse('You are not authorized to perform this action.', 403);
+    //         }
+
+    //         $userId = Auth::id(); // Simpler way to get the user ID
+
+    //         // Check if the user has an active subscription
+    //         $activeDefaultSubscription = Subscription::where('user_id', $userId)
+    //             ->where('stripe_status', 'active')
+    //             ->first();
+
+    //         if (!$activeDefaultSubscription) {
+    //             return $this->errorResponse('You must be subscribed to vote.', 403);
+    //         }
+
+    //         // Check if the product exists and is active
+    //         $product = Product::find($productId);
+    //         if (!$product || !$product->status) {
+    //             return $this->errorResponse('Product not found or is not active.', 404);
+    //         }
+
+    //         // Check if user has already voted for this product recently based on subscription rules
+    //         $lastVote = Vote::where('user_id', $userId)
+    //             ->latest('created_at')
+    //             ->first();
+
+    //         $timeAllowedBetweenVotes = $this->getTimeAllowedBetweenVotes($activeDefaultSubscription); // Implement this method based on subscription rules
+
+    //         if ($lastVote && now()->diffInHours($lastVote->created_at) < $timeAllowedBetweenVotes) {
+    //             return $this->errorResponse('You can only vote once every ' . $timeAllowedBetweenVotes/24 . ' days.', 403);
+    //         }
+
+
+    //         // Cast new vote
+    //         $newVote = Vote::create([
+    //             'user_id' => $userId,
+    //             'product_id' => $productId,
+    //             'votes' => 1,
+    //         ]);
+
+    //         $totalVotes = Vote::where('product_id', $productId)->sum('votes');
+
+    //         return $this->successResponse('Vote added successfully', [
+    //             'product' => $product,
+    //             'total_votes' => $totalVotes,
+    //         ]);
+    //     });
+    // }
+
+    // // Example helper method to determine time allowed between votes
+    // // Example helper method to determine time allowed between votes
+    // protected function getTimeAllowedBetweenVotes($subscription)
+    // {
+    //     // Adjust the return value based on the type or other attributes of the subscription
+    //     switch ($subscription->type_id) {
+    //         case 'default':
+    //             return 24 * 30; // 30 days expressed in hours
+    //         default:
+    //             return 24 * 30; // Adjust as necessary for different subscription types
+    //     }
+    // }
 
 
     // public function vote(Request $request, $productId)
