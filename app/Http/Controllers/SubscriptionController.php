@@ -6,15 +6,17 @@ use Stripe\Stripe;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Stripe\Checkout\Session;
+use App\Traits\HandlesApiResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
-use Laravel\Cashier\Exceptions\IncompletePayment;
 
 use Stripe\Checkout\Session as StripeSession;
+use Laravel\Cashier\Exceptions\IncompletePayment;
 
 
 class SubscriptionController extends Controller
 {
+    use HandlesApiResponse;
 
     public function checkout(Request $request)
     {
@@ -117,8 +119,8 @@ class SubscriptionController extends Controller
     public function cancelSubscription()
     {
         $user = auth()->user();
-        $user->subscription('default')->cancel();
-        return response()->json(['message' => 'Subscription canceled!']);
+        $subscription = $user->subscription('default')->cancel();
+        return response()->json(['message' => 'Subscription canceled!', 'subscription' => $subscription]);
     }
 
 

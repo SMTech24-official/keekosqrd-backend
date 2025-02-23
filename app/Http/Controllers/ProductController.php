@@ -218,106 +218,7 @@ class ProductController extends Controller
         });
     }
 
-    // public function vote(Request $request, $productId)
-    // {
-    //     return $this->safeCall(function () use ($productId) {
-    //         if (!Auth::check()) {
-    //             return $this->errorResponse('You are not authorized to perform this action.', 403);
-    //         }
 
-    //         $userId = Auth::id();
-
-    //         $product = Product::find($productId);
-    //         Log::info("Product: " . $product);
-
-    //         if (!$product) {
-    //             return $this->errorResponse('Product not found.', 404);
-    //         }
-
-    //         if (!$product->status) {
-    //             return $this->errorResponse('Product is not active.', 403);
-    //         }
-    //         $userVotes = Vote::where('user_id', $userId)->count();
-
-    //         if ($userVotes >= 1) {
-    //             return $this->errorResponse('You have already voted for 1 products.', 403);
-    //         }
-    //         $vote = Vote::where('user_id', $userId)->where('product_id', $productId)->first();
-
-    //         if ($vote) {
-    //             return $this->errorResponse('You have already voted for this product.', 403);
-    //         }
-
-    //         Vote::create([
-    //             'user_id' => $userId,
-    //             'product_id' => $productId,
-    //             'votes' => 1,
-    //         ]);
-
-    //         $totalVotes = Vote::where('product_id', $productId)->sum('votes');
-
-    //         return $this->successResponse('Vote added successfully', [
-    //             'product' => $product,
-    //             'total_votes' => $totalVotes,
-    //         ]);
-    //     });
-    // }
-
-    // public function vote(Request $request, $productId)
-    // {
-    //     return $this->safeCall(function () use ($productId) {
-    //         if (!Auth::check()) {
-    //             return $this->errorResponse('You are not authorized to perform this action.', 403);
-    //         }
-
-    //         $userId = Auth::id();
-
-    //         // Check if the user has an active subscription
-    //         $subscription = Payment::where('user_id', $userId)
-    //             ->where('status', 'successful')
-    //             ->first();
-
-    //         if (!$subscription) {
-    //             return $this->errorResponse('You must be subscribed to vote.', 403);
-    //         }
-
-    //         $product = Product::find($productId);
-    //         Log::info("Product: " . $product);
-
-    //         if (!$product) {
-    //             return $this->errorResponse('Product not found.', 404);
-    //         }
-
-    //         if (!$product->status) {
-    //             return $this->errorResponse('Product is not active.', 403);
-    //         }
-
-    //         $userVotes = Vote::where('user_id', $userId)->count();
-
-    //         if ($userVotes >= 1) {
-    //             return $this->errorResponse('You have already voted for 1 product.', 403);
-    //         }
-
-    //         $vote = Vote::where('user_id', $userId)->where('product_id', $productId)->first();
-
-    //         if ($vote) {
-    //             return $this->errorResponse('You have already voted for this product.', 403);
-    //         }
-
-    //         Vote::create([
-    //             'user_id' => $userId,
-    //             'product_id' => $productId,
-    //             'votes' => 1,
-    //         ]);
-
-    //         $totalVotes = Vote::where('product_id', $productId)->sum('votes');
-
-    //         return $this->successResponse('Vote added successfully', [
-    //             'product' => $product,
-    //             'total_votes' => $totalVotes,
-    //         ]);
-    //     });
-    // }
 
     public function vote(Request $request, $productId)
     {
@@ -337,19 +238,25 @@ class ProductController extends Controller
                 return $this->errorResponse('You must be subscribed to vote.', 403);
             }
 
+            // Check if the product exists and is active
             $product = Product::find($productId);
-            if (!$product) {
-                return $this->errorResponse('Product not found.', 404);
+            if (!$product || !$product->status) {
+                return $this->errorResponse('Product not found or is not active.', 404);
             }
 
-            if (!$product->status) {
-                return $this->errorResponse('Product is not active.', 403);
+            // Check if user has already voted for this product recently based on subscription rules
+            $lastVote = Vote::where('user_id', $userId)
+                ->latest('created_at')
+                ->first();
+
+            $timeAllowedBetweenVotes = $this->getTimeAllowedBetweenVotes($activeDefaultSubscription); // Implement this method based on subscription rules
+
+            if ($lastVote && now()->diffInHours($lastVote->created_at) < $timeAllowedBetweenVotes) {
+                return $this->errorResponse('You can only vote once every ' . $timeAllowedBetweenVotes/24 . ' days.', 403);
             }
 
-            if (Vote::where('user_id', $userId)->where('product_id', $productId)->exists()) {
-                return $this->errorResponse('You have already voted for this product.', 403);
-            }
 
+            // Cast new vote
             $newVote = Vote::create([
                 'user_id' => $userId,
                 'product_id' => $productId,
@@ -365,6 +272,20 @@ class ProductController extends Controller
         });
     }
 
+    // Example helper method to determine time allowed between votes
+    // Example helper method to determine time allowed between votes
+    protected function getTimeAllowedBetweenVotes($subscription)
+    {
+        // Adjust the return value based on the type or other attributes of the subscription
+        switch ($subscription->type_id) {
+            case 'default':
+                return 24 * 30; // 30 days expressed in hours
+            default:
+                return 24 * 30; // Adjust as necessary for different subscription types
+        }
+    }
+
+
     // public function vote(Request $request, $productId)
     // {
     //     return $this->safeCall(function () use ($productId) {
@@ -372,59 +293,35 @@ class ProductController extends Controller
     //             return $this->errorResponse('You are not authorized to perform this action.', 403);
     //         }
 
-    //         $userId = Auth::id();
-
-    //         // Debug: Log user attempting to vote
-    //         Log::info("User attempting to vote: user_id={$userId}, product_id={$productId}");
+    //         $userId = Auth::id(); // Simpler way to get the user ID
 
     //         // Check if the user has an active subscription
-    //         $subscription = Payment::where('user_id', $userId)
-    //             ->where('status', 'succeeded')
+    //         $activeDefaultSubscription = Subscription::where('user_id', $userId)
+    //             ->where('stripe_status', 'active')
     //             ->first();
 
-    //         // Debug: Log subscription check
-    //         Log::info("Subscription check for user_id={$userId}: " . json_encode($subscription));
-
-    //         if (!$subscription) {
+    //         if (!$activeDefaultSubscription) {
     //             return $this->errorResponse('You must be subscribed to vote.', 403);
     //         }
 
     //         $product = Product::find($productId);
-
     //         if (!$product) {
     //             return $this->errorResponse('Product not found.', 404);
     //         }
-
-    //         // Debug: Log product details
-    //         Log::info("Product found: " . json_encode($product));
 
     //         if (!$product->status) {
     //             return $this->errorResponse('Product is not active.', 403);
     //         }
 
-    //         $userVotes = Vote::where('user_id', $userId)->count();
-
-    //         if ($userVotes >= 1) {
-    //             return $this->errorResponse('You have already voted for 1 product.', 403);
-    //         }
-
-    //         $vote = Vote::where('user_id', $userId)->where('product_id', $productId)->first();
-
-    //         if ($vote) {
+    //         if (Vote::where('user_id', $userId)->where('product_id', $productId)->exists()) {
     //             return $this->errorResponse('You have already voted for this product.', 403);
     //         }
-
-    //         // Log vote creation attempt
-    //         Log::info("Creating vote for user_id={$userId}, product_id={$productId}");
 
     //         $newVote = Vote::create([
     //             'user_id' => $userId,
     //             'product_id' => $productId,
     //             'votes' => 1,
     //         ]);
-
-    //         // Debug: Log the newly created vote
-    //         Log::info("Vote created: " . json_encode($newVote));
 
     //         $totalVotes = Vote::where('product_id', $productId)->sum('votes');
 
@@ -434,4 +331,6 @@ class ProductController extends Controller
     //         ]);
     //     });
     // }
+
+
 }
