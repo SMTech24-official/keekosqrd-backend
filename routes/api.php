@@ -100,14 +100,14 @@ Route::group([
     });
 
 
-
-
-
-
     Route::post('checkout', [SubscriptionController::class, 'checkout']);
 
     Route::post('/cancel-subscription', [SubscriptionController::class, 'cancelSubscription']);
     Route::post('/resume-subscription', [SubscriptionController::class, 'resumeSubscription']);
+
+    // API route
+    Route::post('/subscription/update-checkout', [SubscriptionController::class, 'updateSubscriptionCheckout'])->name('subscription.update-checkout');
+
 
     // Route::post('/stripe/webhook', [StripeWebhookController::class, 'handleWebhook']);
 
