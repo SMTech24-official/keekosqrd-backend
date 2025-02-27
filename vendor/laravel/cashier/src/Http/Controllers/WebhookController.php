@@ -269,6 +269,31 @@ class WebhookController extends Controller
     }
 
 
+    protected function handleCheckoutSessionCompleted(array $payload)
+    {
+        // Assuming you have a method to find the user or subscription by Stripe's session ID or customer ID
+        $customerId = $payload['data']['object']['customer'];
+        $subscriptionId = $payload['data']['object']['subscription'];
+
+        $user = $this->getUserByStripeId($customerId);
+        if (!$user) {
+            return $this->successMethod();
+        }
+
+        // Retrieve the subscription from your database
+        $subscription = $user->subscriptions()->where('stripe_id', $subscriptionId)->first();
+
+        if ($subscription) {
+            // Update subscription status based on webhook data
+            $subscription->stripe_status = 'active'; // Set to active or any other status based on your requirement
+            $subscription->save();
+
+        } else {
+        }
+
+        return $this->successMethod();
+    }
+
     // protected function handleCheckoutSessionCompleted(array $payload)
     // {
     //     // Assuming you have a method to find the user or subscription by Stripe's session ID or customer ID
@@ -294,41 +319,7 @@ class WebhookController extends Controller
     //     return $this->successMethod();
     // }
 
-    protected function handleCheckoutSessionCompleted(array $payload)
-    {
-        // Log the payload received to debug the event
-        Log::info('Checkout session completed', ['payload' => $payload]);
 
-        // Assuming you have a method to find the user or subscription by Stripe's session ID or customer ID
-        $customerId = $payload['data']['object']['customer'];
-        $subscriptionId = $payload['data']['object']['subscription'];
-
-        Log::info('Processing checkout for user', ['customer_id' => $customerId, 'subscription_id' => $subscriptionId]);
-
-        $user = $this->getUserByStripeId($customerId);
-        if (!$user) {
-            Log::warning('User not found for checkout session', ['customer_id' => $customerId]);
-            return $this->successMethod();
-        }
-
-        // Retrieve the subscription from your database
-        $subscription = $user->subscriptions()->where('stripe_id', $subscriptionId)->first();
-
-        if ($subscription) {
-            // Log the subscription update
-            Log::info('Updating subscription status to active', ['subscription_id' => $subscriptionId]);
-
-            // Update subscription status based on webhook data
-            $subscription->stripe_status = 'active'; // Set to active or any other status based on your requirement
-            $subscription->save();
-
-            Log::info('Subscription status updated successfully', ['subscription_id' => $subscriptionId]);
-        } else {
-            Log::warning('Subscription not found for user', ['subscription_id' => $subscriptionId, 'user_id' => $user->id]);
-        }
-
-        return $this->successMethod();
-    }
 
 
 
