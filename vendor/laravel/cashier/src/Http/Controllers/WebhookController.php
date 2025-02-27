@@ -2,21 +2,20 @@
 
 namespace Laravel\Cashier\Http\Controllers;
 
-use Stripe\Stripe;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use Laravel\Cashier\Cashier;
-use Laravel\Cashier\Payment;
-use Illuminate\Support\Carbon;
-use Laravel\Cashier\Subscription;
-use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Cashier\Events\WebhookReceived;
+use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
+use Laravel\Cashier\Payment;
+use Laravel\Cashier\Subscription;
+use Stripe\Stripe;
 use Stripe\Subscription as StripeSubscription;
 use Symfony\Component\HttpFoundation\Response;
-use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
 
 class WebhookController extends Controller
 {
@@ -71,25 +70,21 @@ class WebhookController extends Controller
      */
     protected function handleCustomerSubscriptionCreated(array $payload)
     {
-        // Log the incoming payload for debugging purposes
-        Log::info('Received customer subscription created webhook', ['payload' => $payload]);
-
         $user = $this->getUserByStripeId($payload['data']['object']['customer']);
 
         if ($user) {
             $data = $payload['data']['object'];
 
-            Log::info('Found user, processing subscription', ['user_id' => $user->id, 'stripe_subscription_id' => $data['id']]);
-
             if (! $user->subscriptions->contains('stripe_id', $data['id'])) {
-                // Handle trial end
-                $trialEndsAt = isset($data['trial_end']) ? Carbon::createFromTimestamp($data['trial_end']) : null;
+                if (isset($data['trial_end'])) {
+                    $trialEndsAt = Carbon::createFromTimestamp($data['trial_end']);
+                } else {
+                    $trialEndsAt = null;
+                }
 
-                // Get the first item (for single price subscriptions)
                 $firstItem = $data['items']['data'][0];
                 $isSinglePrice = count($data['items']['data']) === 1;
 
-                // Create the subscription
                 $subscription = $user->subscriptions()->create([
                     'type' => $data['metadata']['type'] ?? $data['metadata']['name'] ?? $this->newSubscriptionType($payload),
                     'stripe_id' => $data['id'],
@@ -108,69 +103,17 @@ class WebhookController extends Controller
                         'quantity' => $item['quantity'] ?? null,
                     ]);
                 }
-
-                Log::info('Subscription created for user', ['user_id' => $user->id, 'subscription_id' => $subscription->id]);
             }
 
             // Terminate the billable's generic trial if it exists...
             if (! is_null($user->trial_ends_at)) {
                 $user->trial_ends_at = null;
                 $user->save();
-                Log::info('Trial ended for user', ['user_id' => $user->id]);
             }
-        } else {
-            Log::warning('User not found for subscription creation', ['customer_id' => $payload['data']['object']['customer']]);
         }
 
         return $this->successMethod();
     }
-
-    // protected function handleCustomerSubscriptionCreated(array $payload)
-    // {
-    //     $user = $this->getUserByStripeId($payload['data']['object']['customer']);
-
-    //     if ($user) {
-    //         $data = $payload['data']['object'];
-
-    //         if (! $user->subscriptions->contains('stripe_id', $data['id'])) {
-    //             if (isset($data['trial_end'])) {
-    //                 $trialEndsAt = Carbon::createFromTimestamp($data['trial_end']);
-    //             } else {
-    //                 $trialEndsAt = null;
-    //             }
-
-    //             $firstItem = $data['items']['data'][0];
-    //             $isSinglePrice = count($data['items']['data']) === 1;
-
-    //             $subscription = $user->subscriptions()->create([
-    //                 'type' => $data['metadata']['type'] ?? $data['metadata']['name'] ?? $this->newSubscriptionType($payload),
-    //                 'stripe_id' => $data['id'],
-    //                 'stripe_status' => $data['status'],
-    //                 'stripe_price' => $isSinglePrice ? $firstItem['price']['id'] : null,
-    //                 'quantity' => $isSinglePrice && isset($firstItem['quantity']) ? $firstItem['quantity'] : null,
-    //                 'trial_ends_at' => $trialEndsAt,
-    //                 'ends_at' => null,
-    //             ]);
-
-    //             foreach ($data['items']['data'] as $item) {
-    //                 $subscription->items()->create([
-    //                     'stripe_id' => $item['id'],
-    //                     'stripe_product' => $item['price']['product'],
-    //                     'stripe_price' => $item['price']['id'],
-    //                     'quantity' => $item['quantity'] ?? null,
-    //                 ]);
-    //             }
-    //         }
-
-    //         // Terminate the billable's generic trial if it exists...
-    //         if (! is_null($user->trial_ends_at)) {
-    //             $user->trial_ends_at = null;
-    //             $user->save();
-    //         }
-    //     }
-
-    //     return $this->successMethod();
-    // }
 
     /**
      * Determines the type that should be used when new subscriptions are created from the Stripe dashboard.
@@ -296,12 +239,18 @@ class WebhookController extends Controller
 
     // protected function handleCheckoutSessionCompleted(array $payload)
     // {
+    //     // Log the payload received to debug the event
+    //     Log::info('Checkout session completed', ['payload' => $payload]);
+
     //     // Assuming you have a method to find the user or subscription by Stripe's session ID or customer ID
     //     $customerId = $payload['data']['object']['customer'];
     //     $subscriptionId = $payload['data']['object']['subscription'];
 
+    //     Log::info('Processing checkout for user', ['customer_id' => $customerId, 'subscription_id' => $subscriptionId]);
+
     //     $user = $this->getUserByStripeId($customerId);
     //     if (!$user) {
+    //         Log::warning('User not found for checkout session', ['customer_id' => $customerId]);
     //         return $this->successMethod();
     //     }
 
@@ -309,19 +258,20 @@ class WebhookController extends Controller
     //     $subscription = $user->subscriptions()->where('stripe_id', $subscriptionId)->first();
 
     //     if ($subscription) {
+    //         // Log the subscription update
+    //         Log::info('Updating subscription status to active', ['subscription_id' => $subscriptionId]);
+
     //         // Update subscription status based on webhook data
     //         $subscription->stripe_status = 'active'; // Set to active or any other status based on your requirement
     //         $subscription->save();
 
+    //         Log::info('Subscription status updated successfully', ['subscription_id' => $subscriptionId]);
     //     } else {
+    //         Log::warning('Subscription not found for user', ['subscription_id' => $subscriptionId, 'user_id' => $user->id]);
     //     }
 
     //     return $this->successMethod();
     // }
-
-
-
-
 
     /**
      * Handle the cancellation of a customer subscription.

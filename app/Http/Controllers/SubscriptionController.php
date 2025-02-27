@@ -27,21 +27,13 @@ class SubscriptionController extends Controller
 
         // $stripePriceId = 'price_1QtSpH09AAAGge5IbxTaBlNi'; // live id
 
-        // Log user info
-        Log::info('Checkout started for user', ['user_id' => $user->id, 'email' => $user->email]);
-
         // Create Stripe customer if one does not exist
         if (!$user->hasStripeId()) {
-            Log::info('Creating Stripe customer for user', ['user_id' => $user->id]);
             $user->createAsStripeCustomer();
-        } else {
-            Log::info('Stripe customer already exists for user', ['user_id' => $user->id, 'stripe_id' => $user->stripe_id]);
         }
 
         // Create a Stripe Checkout session
         try {
-            Log::info('Creating Stripe Checkout session', ['price_id' => $stripePriceId, 'user_id' => $user->id]);
-
             $checkoutSession = Session::create([
                 'payment_method_types' => ['card'],
                 'line_items' => [
@@ -52,73 +44,21 @@ class SubscriptionController extends Controller
                 ],
                 'mode' => 'subscription', // Set the mode to subscription for recurring payments
                 'customer' => $user->stripe_id,
+                // 'success_url' => route('checkout-success'),
+                // 'cancel_url' => route('checkout-cancel'),
                 'success_url' => 'https://www.ksquaredsourcedcity.com/',
                 'cancel_url' => 'https://www.ksquaredsourcedcity.com/',
-            ]);
 
-            // Log session URL
-            Log::info('Stripe Checkout session created successfully', ['session_url' => $checkoutSession->url]);
+            ]);
 
             // Return the session URL for redirect
             return response()->json([
                 'url' => $checkoutSession->url,
             ]);
         } catch (\Exception $e) {
-            // Log the error
-            Log::error('Error creating Stripe Checkout session', [
-                'error_message' => $e->getMessage(),
-                'user_id' => $user->id
-            ]);
-
             return response()->json(['error' => $e->getMessage()], 400);
         }
     }
-
-
-    // public function checkout(Request $request)
-    // {
-    //     $user = auth()->user();
-
-    //     // Set your secret Stripe API key
-    //     Stripe::setApiKey(config('cashier.secret'));
-
-    //     // Stripe price ID for the subscription (create this in your Stripe Dashboard)
-    //     $stripePriceId = 'price_1QmbEQDgYV6zJ17vhlyPX5Vb'; // Replace with your actual recurring price ID
-
-    //     // $stripePriceId = 'price_1QtSpH09AAAGge5IbxTaBlNi'; // live id
-
-    //     // Create Stripe customer if one does not exist
-    //     if (!$user->hasStripeId()) {
-    //         $user->createAsStripeCustomer();
-    //     }
-
-    //     // Create a Stripe Checkout session
-    //     try {
-    //         $checkoutSession = Session::create([
-    //             'payment_method_types' => ['card'],
-    //             'line_items' => [
-    //                 [
-    //                     'price' => $stripePriceId,
-    //                     'quantity' => 1,
-    //                 ],
-    //             ],
-    //             'mode' => 'subscription', // Set the mode to subscription for recurring payments
-    //             'customer' => $user->stripe_id,
-    //             // 'success_url' => route('checkout-success'),
-    //             // 'cancel_url' => route('checkout-cancel'),
-    //             'success_url' => 'https://www.ksquaredsourcedcity.com/',
-    //             'cancel_url' => 'https://www.ksquaredsourcedcity.com/',
-
-    //         ]);
-
-    //         // Return the session URL for redirect
-    //         return response()->json([
-    //             'url' => $checkoutSession->url,
-    //         ]);
-    //     } catch (\Exception $e) {
-    //         return response()->json(['error' => $e->getMessage()], 400);
-    //     }
-    // }
 
     public function resumeSubscription()
     {
